@@ -1,0 +1,67 @@
+# Maven
+/target/
+!.mvn/wrapper/maven-wrapper.jar
+.mvn/timing.properties
+
+# IntelliJ IDEA
+/.idea/
+*.iml
+*.iws
+out/
+*.ipr
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Lombok
+lombok.config
+
+# Database files (если тестируешь на H2 в file-mode)
+*.mv.db
+*.h2.db
+
+# Flyway SQL migrations (если не хранишь их в репозитории - по желанию)
+# !src/main/resources/db/migration/
+
+# VSCode (если вдруг кто-то использует)
+.vscode/
+
+# Mac/Linux
+ehthumbs.db
+Icon?
+*.swp
+
+# Env
+.env
+
+# Application properties override (например, для локальных dev настроек)
+application-local.properties
+
+# Сборки, кэш, IDE temp files
+*.class
+*.swp
+*.swo
+
+# Настройки тестов и отчёты
+/test-output/
+*.test
+*.tmp
+
+# Java Flight Recorder
+*.jfr
+
+# Packaging
+*.jar
+*.war
+*.ear
+
+# Секреты, токены
+bot-token.txt
+
+# Misc
+bin/
+build/
