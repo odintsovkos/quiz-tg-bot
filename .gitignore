@@ -39,7 +39,7 @@ Icon?
 .env
 
 # Application properties override (например, для локальных dev настроек)
-application-local.properties
+application.properties
 
 # Сборки, кэш, IDE temp files
 *.class
