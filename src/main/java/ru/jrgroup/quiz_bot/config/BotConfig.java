@@ -2,6 +2,8 @@ package ru.jrgroup.quiz_bot.config;
 
 import lombok.Getter;
 import lombok.Setter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.telegram.telegrambots.meta.TelegramBotsApi;
@@ -56,9 +58,15 @@ public class BotConfig {
      */
     @Bean
     public TelegramBotsApi telegramBotsApi(QuizBot quizBot) throws Exception {
-        TelegramBotsApi botsApi = new TelegramBotsApi(DefaultBotSession.class);
-        botsApi.registerBot(quizBot);
-        System.out.println("Telegram bot зарегистрирован вручную через BotConfig!");
-        return botsApi;
+        Logger log = LoggerFactory.getLogger(BotConfig.class);
+        try {
+            TelegramBotsApi botsApi = new TelegramBotsApi(DefaultBotSession.class);
+            botsApi.registerBot(quizBot);
+            log.info("Telegram бот '{}' успешно зарегистрирован вручную через BotConfig!", quizBot.getBotUsername());
+            return botsApi;
+        } catch (Exception ex) {
+            log.error("Ошибка при регистрации Telegram бота через BotConfig: {}", ex.getMessage(), ex);
+            throw ex;
+        }
     }
 }
