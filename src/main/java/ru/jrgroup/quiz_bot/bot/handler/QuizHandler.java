@@ -1,5 +1,7 @@
 package ru.jrgroup.quiz_bot.bot.handler;
 
+import org.springframework.stereotype.Component;
+
 /**
  * Специализированный обработчик для логики викторин.
  *
@@ -8,5 +10,6 @@ package ru.jrgroup.quiz_bot.bot.handler;
  * - Генерирует и отправляет клавиатуры с вариантами ответов.
  */
 
+@Component
 public class QuizHandler {
 }

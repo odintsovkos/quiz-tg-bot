@@ -1,5 +1,7 @@
 package ru.jrgroup.quiz_bot.bot.handler;
 
+import org.springframework.stereotype.Component;
+
 /**
  * Обработчик текстовых команд Telegram.
  *
@@ -8,7 +10,6 @@ package ru.jrgroup.quiz_bot.bot.handler;
  * - Вызывает бизнес-логику через сервисы.
  */
 
+@Component
 public class CommandHandler {
-
-
 }
