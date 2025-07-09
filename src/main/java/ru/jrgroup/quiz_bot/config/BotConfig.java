@@ -1,5 +1,6 @@
 package ru.jrgroup.quiz_bot.config;
 
+import lombok.Getter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -20,6 +21,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * </pre>
  * </p>
  */
+@Getter
 @ConfigurationProperties(prefix = "bot")
 public class BotConfig {
     /** Имя бота (любое произвольное имя, для внутреннего использования). */
