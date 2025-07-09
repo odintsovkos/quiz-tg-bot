@@ -15,7 +15,7 @@
 
 1. **Склонируйте репозиторий:**
     ```bash
-    git clone https://github.com/odintsovkos/quiz-telegram-bot.git
+    git clone https://github.com/odintsovkos/quiz-tg-bot.git
     ```
 2. **Перейдите в папку проекта:**
     ```bash
