@@ -41,7 +41,6 @@ public class Topic {
 	 */
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	@NotNull
 	private Long id;
 
 	/**
