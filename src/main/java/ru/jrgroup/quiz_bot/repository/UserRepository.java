@@ -1,5 +1,11 @@
 package ru.jrgroup.quiz_bot.repository;
 
+import org.springframework.data.jpa.repository.JpaRepository;
+import ru.jrgroup.quiz_bot.domain.User;
+
+import java.util.List;
+import java.util.Optional;
+
 /**
  * JPA-репозиторий для пользователей.
  *
@@ -7,5 +13,8 @@ package ru.jrgroup.quiz_bot.repository;
  * - Методы поиска по telegramId, username
  */
 
-public class UserRepository {
+public interface UserRepository extends JpaRepository<User, Long> {
+    Optional<User> findByTelegramId(Long telegramId);
+    List<User> getAllUsers();
+    Optional<User> findByUsername(String username);
 }

@@ -1,5 +1,7 @@
 package ru.jrgroup.quiz_bot.bot;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -29,6 +31,8 @@ import ru.jrgroup.quiz_bot.config.BotConfig;
 @Component
 public class QuizBot extends TelegramLongPollingBot {
 
+    private static final Logger log = LoggerFactory.getLogger(QuizBot.class);
+
     private final BotConfig botConfig;
     private final CommandHandler commandHandler;
     private final MessageHandler messageHandler;
@@ -54,6 +58,7 @@ public class QuizBot extends TelegramLongPollingBot {
         this.messageHandler = messageHandler;
         this.callbackHandler = callbackHandler;
         this.quizHandler = quizHandler;
+        log.info("QuizBot инициализирован с username: {}", botConfig.getUsername());
     }
 
     /**
@@ -65,30 +70,33 @@ public class QuizBot extends TelegramLongPollingBot {
      */
     @Override
     public void onUpdateReceived(Update update) {
+        log.debug("Получено новое обновление: {}", update);
         try {
             if (update.hasMessage() && update.getMessage().hasText()) {
                 String messageText = update.getMessage().getText();
+                Long userId = update.getMessage().getFrom().getId();
                 if (messageText.startsWith("/")) {
-                    // Делегировать обработку команды
-                     commandHandler.handleCommand(update);
+                    log.info("Пользователь {} прислал команду: {}", userId, messageText);
+                    commandHandler.handleCommand(update);
                 } else {
-                    // Делегировать обработку обычного сообщения
-                     messageHandler.handleMessage(update);
+                    log.info("Пользователь {} прислал сообщение: {}", userId, messageText);
+                    messageHandler.handleMessage(update);
                 }
             } else if (update.hasCallbackQuery()) {
-                // Делегировать обработку callback-запроса
-                 callbackHandler.handleCallback(update);
+                String callbackData = update.getCallbackQuery().getData();
+                Long userId = update.getCallbackQuery().getFrom().getId();
+                log.info("Пользователь {} выбрал callback: {}", userId, callbackData);
+                callbackHandler.handleCallback(update);
             } else if (update.hasMessage() && update.getMessage().hasPoll()) {
-                // Делегировать обработку опроса
-                 quizHandler.handlePoll(update);
+                String pollQuestion = update.getMessage().getPoll().getQuestion();
+                Long userId = update.getMessage().getFrom().getId();
+                log.info("Пользователь {} прислал опрос: {}", userId, pollQuestion);
+                quizHandler.handlePoll(update);
             } else {
-                // Логируем неизвестный/неподдерживаемый тип обновления
-                System.out.println("Получено неподдерживаемое обновление: " + update);
+                log.warn("Получено неподдерживаемое обновление: {}", update);
             }
         } catch (Exception e) {
-            // Здесь лучше подключить полноценное логирование
-            System.err.println("Ошибка обработки обновления: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Ошибка при обработке обновления: {}", update, e);
         }
     }
 
@@ -99,6 +107,7 @@ public class QuizBot extends TelegramLongPollingBot {
      */
     @Override
     public String getBotUsername() {
+        log.debug("Запрошен username бота");
         return botConfig.getUsername();
     }
 
