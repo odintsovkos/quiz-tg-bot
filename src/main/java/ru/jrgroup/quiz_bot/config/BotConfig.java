@@ -45,6 +45,9 @@ public class BotConfig {
     /** Username бота в Telegram (без @) */
     private String username;
 
+    private static final Logger  log = LoggerFactory.getLogger(BotConfig.class);
+
+
     /**
      * Бин для ручной регистрации Telegram-бота.
      * <p>
@@ -58,7 +61,6 @@ public class BotConfig {
      */
     @Bean
     public TelegramBotsApi telegramBotsApi(QuizBot quizBot) throws Exception {
-        Logger log = LoggerFactory.getLogger(BotConfig.class);
         try {
             TelegramBotsApi botsApi = new TelegramBotsApi(DefaultBotSession.class);
             botsApi.registerBot(quizBot);
