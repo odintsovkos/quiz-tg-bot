@@ -65,3 +65,4 @@ bot-token.txt
 # Misc
 bin/
 build/
+application.properties
