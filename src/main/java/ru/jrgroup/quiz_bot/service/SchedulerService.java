@@ -3,6 +3,7 @@ package ru.jrgroup.quiz_bot.service;
 import org.jvnet.hk2.annotations.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import ru.jrgroup.quiz_bot.bot.QuizBot;
 
 /**
  * Сервис для задач по расписанию.
@@ -13,6 +14,12 @@ import org.slf4j.LoggerFactory;
 @Service
 public class SchedulerService {
     private static final Logger log = LoggerFactory.getLogger(SchedulerService.class);
+
+    private QuizBot quizBot;
+
+    public SchedulerService (QuizBot quizBot) {
+        this.quizBot = quizBot;
+    }
 
     public void sendDailyQuiz() {
         log.info("The daily quiz has started sending out");
