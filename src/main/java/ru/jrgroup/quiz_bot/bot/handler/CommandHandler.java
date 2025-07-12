@@ -4,11 +4,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
+import org.telegram.telegrambots.meta.api.methods.polls.SendPoll;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+import ru.jrgroup.quiz_bot.domain.Question;
 import ru.jrgroup.quiz_bot.domain.Topic;
 import ru.jrgroup.quiz_bot.domain.User;
+import ru.jrgroup.quiz_bot.service.QuestionService;
 import ru.jrgroup.quiz_bot.service.TopicService;
 import ru.jrgroup.quiz_bot.service.UserService;
 
@@ -29,10 +33,12 @@ public class CommandHandler {
 	private static final Logger logger = LoggerFactory.getLogger(CommandHandler.class);
 	private final UserService userService;
 	private final TopicService topicService;
+	private final QuestionService questionService;
 
-	public CommandHandler(UserService userService, TopicService topicService) {
+	public CommandHandler(UserService userService, TopicService topicService, QuestionService questionService) {
 		this.userService = userService;
 		this.topicService = topicService;
+		this.questionService = questionService;
 	}
 
 	public void handleCommand(Update update, TelegramLongPollingBot bot) {
@@ -52,9 +58,18 @@ public class CommandHandler {
 			case "/topics":
 				handleTopicsCommand(chatId, threadID, bot);
 				break;
+			case "/question":
+				handleQuestionCommand(chatId, threadID, bot);
+				break;
 			default:
 				handleUnknownCommand(message.getText(), chatId, threadID, bot);
 		}
+	}
+
+	private void handleQuestionCommand(Long chatId, Integer threadID, TelegramLongPollingBot bot) {
+		Question question = questionService.findRandomQuestion();
+
+		sendPoll(bot, chatId, threadID, question);
 	}
 
 	private void handleTopicsCommand(Long chatId, Integer threadID, TelegramLongPollingBot bot) {
@@ -124,5 +139,24 @@ public class CommandHandler {
 		} catch (Exception e) {
 			logger.error("Ошибка при отправке сообщения в чат {} с threadID {}: {}", chatId, threadID, e.getMessage(), e);
 		}
+	}
+
+	private void sendPoll(TelegramLongPollingBot bot, Long chatId, Integer threadID, Question question) {
+		SendPoll poll = SendPoll.builder()
+				.chatId(chatId.toString())
+				.question(question.getText())
+				.options(question.getOptions())
+				.isAnonymous(false)
+				.type("quiz")
+				.correctOptionId(question.getCorrectOption())
+				.messageThreadId(threadID)
+				.build();
+
+		try {
+			bot.execute(poll);
+		} catch (TelegramApiException e) {
+			logger.error(e.getMessage());
+		}
+
 	}
 }
