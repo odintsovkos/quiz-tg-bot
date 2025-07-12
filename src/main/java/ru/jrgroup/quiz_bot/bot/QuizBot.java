@@ -80,18 +80,20 @@ public class QuizBot extends TelegramLongPollingBot {
                     commandHandler.handleCommand(update, this);
                 } else {
                     log.info("Пользователь {} прислал сообщение: {}", userId, messageText);
-//                    messageHandler.handleMessage(update);
+
+//TODO                    messageHandler.handleMessage(update);
+
                 }
             } else if (update.hasCallbackQuery()) {
                 String callbackData = update.getCallbackQuery().getData();
                 Long userId = update.getCallbackQuery().getFrom().getId();
                 log.info("Пользователь {} выбрал callback: {}", userId, callbackData);
-//                callbackHandler.handleCallback(update);
+//TODO                callbackHandler.handleCallback(update);
             } else if (update.hasMessage() && update.getMessage().hasPoll()) {
                 String pollQuestion = update.getMessage().getPoll().getQuestion();
                 Long userId = update.getMessage().getFrom().getId();
                 log.info("Пользователь {} прислал опрос: {}", userId, pollQuestion);
-//                quizHandler.handlePoll(update);
+//TODO                quizHandler.handlePoll(update);
             } else {
                 log.warn("Получено неподдерживаемое обновление: {}", update);
             }

@@ -50,15 +50,31 @@ public class CommandHandler {
 				handleUnknownCommand("/help", chatId, threadID, bot);
 				break;
 			case "/topics":
-				handleTopicsCommand("/topics", chatId, threadID, bot);
+				handleTopicsCommand(chatId, threadID, bot);
 				break;
 			default:
 				handleUnknownCommand(message.getText(), chatId, threadID, bot);
 		}
 	}
 
-	private void handleTopicsCommand(String s, Long chatId, Integer threadID, TelegramLongPollingBot bot) {
+	private void handleTopicsCommand(Long chatId, Integer threadID, TelegramLongPollingBot bot) {
 		List<Topic> topics = topicService.findAll();
+
+		if (topics.isEmpty()) {
+			sendText(bot, chatId, threadID, "Список тем пуст.");
+			return;
+		}
+
+		StringBuilder sb = new StringBuilder();
+		sb.append("Список тем:\n\n");
+		int i = 1;
+		for (Topic topic : topics) {
+			sb.append("№ ").append(i++).append("\n")
+					.append(topic.getName()).append(" - ")
+					.append(topic.getDescription()).append("\n");
+		}
+
+		sendText(bot, chatId, threadID, sb.toString());
 	}
 
 	private void handleUnknownCommand(String command, Long chatId, Integer threadId, TelegramLongPollingBot bot) {
