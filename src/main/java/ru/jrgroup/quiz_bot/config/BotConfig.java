@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.telegram.telegrambots.bots.DefaultBotOptions;
 import org.telegram.telegrambots.meta.TelegramBotsApi;
 import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
 import ru.jrgroup.quiz_bot.bot.QuizBot;
@@ -63,6 +64,11 @@ public class BotConfig {
     public TelegramBotsApi telegramBotsApi(QuizBot quizBot) throws Exception {
         try {
             TelegramBotsApi botsApi = new TelegramBotsApi(DefaultBotSession.class);
+            DefaultBotSession session = new DefaultBotSession();
+            DefaultBotOptions botOptions = new DefaultBotOptions();
+            botOptions.setMaxThreads(10);
+            botOptions.setGetUpdatesTimeout(60);
+            session.setOptions(botOptions);
             botsApi.registerBot(quizBot);
             log.info("Telegram бот '{}' успешно зарегистрирован вручную через BotConfig!", quizBot.getBotUsername());
             return botsApi;

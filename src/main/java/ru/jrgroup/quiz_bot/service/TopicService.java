@@ -1,5 +1,7 @@
 package ru.jrgroup.quiz_bot.service;
 
+import org.springframework.stereotype.Service;
+
 /**
  * Сервис для работы с темами и категориями.
  *
@@ -8,5 +10,6 @@ package ru.jrgroup.quiz_bot.service;
  * - getQuestionsByTopic(Long topicId) — вопросы по теме
  */
 
+@Service
 public class TopicService {
 }

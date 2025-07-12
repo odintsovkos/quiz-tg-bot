@@ -15,6 +15,5 @@ import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByTelegramId(Long telegramId);
-    List<User> findAll();
     Optional<User> findByUsername(String username);
 }
