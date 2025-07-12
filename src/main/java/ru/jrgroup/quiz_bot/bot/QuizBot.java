@@ -80,7 +80,9 @@ public class QuizBot extends TelegramLongPollingBot {
                     commandHandler.handleCommand(update, this);
                 } else {
                     log.info("Пользователь {} прислал сообщение: {}", userId, messageText);
+
 //TODO                    messageHandler.handleMessage(update);
+
                 }
             } else if (update.hasCallbackQuery()) {
                 String callbackData = update.getCallbackQuery().getData();
