@@ -8,7 +8,9 @@ import org.telegram.telegrambots.meta.api.methods.polls.SendPoll;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+import ru.jrgroup.quiz_bot.bot.keyboard.KeyboardFactory;
 import ru.jrgroup.quiz_bot.domain.Question;
 import ru.jrgroup.quiz_bot.domain.Topic;
 import ru.jrgroup.quiz_bot.domain.User;
@@ -34,11 +36,13 @@ public class CommandHandler {
 	private final UserService userService;
 	private final TopicService topicService;
 	private final QuestionService questionService;
+	private final KeyboardFactory keyboardFactory;
 
-	public CommandHandler(UserService userService, TopicService topicService, QuestionService questionService) {
+	public CommandHandler(UserService userService, TopicService topicService, QuestionService questionService, KeyboardFactory keyboardFactory) {
 		this.userService = userService;
 		this.topicService = topicService;
 		this.questionService = questionService;
+		this.keyboardFactory = keyboardFactory;
 	}
 
 	public void handleCommand(Update update, TelegramLongPollingBot bot) {
@@ -49,6 +53,9 @@ public class CommandHandler {
 		userService.registerOrUpdateUser(message);
 
 		switch (message.getText()) {
+			case "/start":
+				handleStartCommand(chatId, threadID, bot);
+				break;
 			case "/users":
 				handleUsersCommand(chatId, threadID, bot);
 				break;
@@ -66,6 +73,13 @@ public class CommandHandler {
 		}
 	}
 
+	private void handleStartCommand(Long chatId, Integer threadID, TelegramLongPollingBot bot) {
+		StringBuilder stringBuilder = new StringBuilder();
+		stringBuilder.append("Добро пожаловать в Quiz Bot!\n")
+				.append("Используйте /help для получения списка доступных команд.\n\n");
+		sendText(bot, chatId, threadID, stringBuilder.toString(), keyboardFactory.mainMenu());
+	}
+
 	private void handleQuestionCommand(Long chatId, Integer threadID, TelegramLongPollingBot bot) {
 		Question question = questionService.findRandomQuestion();
 
@@ -76,7 +90,7 @@ public class CommandHandler {
 		List<Topic> topics = topicService.findAll();
 
 		if (topics.isEmpty()) {
-			sendText(bot, chatId, threadID, "Список тем пуст.");
+			sendText(bot, chatId, threadID, "Список тем пуст.", keyboardFactory.mainMenu());
 			return;
 		}
 
@@ -89,19 +103,19 @@ public class CommandHandler {
 					.append(topic.getDescription()).append("\n");
 		}
 
-		sendText(bot, chatId, threadID, sb.toString());
+		sendText(bot, chatId, threadID, sb.toString(), keyboardFactory.mainMenu());
 	}
 
 	private void handleUnknownCommand(String command, Long chatId, Integer threadId, TelegramLongPollingBot bot) {
 		String message = "Неизвестная команда: " + command + ". Используйте /help для справки.";
-		sendText(bot, chatId, threadId, message);
+		sendText(bot, chatId, threadId, message, keyboardFactory.mainMenu());
 	}
 
 	private void handleUsersCommand(Long chatId, Integer threadID, TelegramLongPollingBot bot) {
 		List<User> users = userService.findAll();
 
 		if (users.isEmpty()) {
-			sendText(bot, chatId, threadID, "Нет зарегистрированных пользователей.");
+			sendText(bot, chatId, threadID, "Нет зарегистрированных пользователей.", keyboardFactory.mainMenu());
 			return;
 		}
 
@@ -121,18 +135,17 @@ public class CommandHandler {
 					.append("------\n");
 		}
 
-		sendText(bot, chatId, threadID, sb.toString());
+		sendText(bot, chatId, threadID, sb.toString(), keyboardFactory.mainMenu());
 	}
 
-
-
-	private void sendText(TelegramLongPollingBot bot, Long chatId, Integer threadID, String text) {
+	private void sendText(TelegramLongPollingBot bot, Long chatId, Integer threadID, String text, ReplyKeyboardMarkup keyboard) {
 		SendMessage message = new SendMessage();
 		message.setChatId(chatId);
 		message.setText(text);
 		if (threadID != null && threadID != 0) {
 			message.setMessageThreadId(threadID);
 		}
+		message.setReplyMarkup(keyboard);
 
 		try {
 			bot.execute(message);
@@ -157,6 +170,5 @@ public class CommandHandler {
 		} catch (TelegramApiException e) {
 			logger.error(e.getMessage());
 		}
-
 	}
 }

@@ -4,6 +4,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
+import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
+import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import ru.jrgroup.quiz_bot.bot.handler.CallbackHandler;
 import ru.jrgroup.quiz_bot.bot.handler.CommandHandler;
@@ -75,8 +78,38 @@ public class QuizBot extends TelegramLongPollingBot {
             if (update.hasMessage() && update.getMessage().hasText()) {
                 String messageText = update.getMessage().getText();
                 Long userId = update.getMessage().getFrom().getId();
+                Long chatId = update.getMessage().getChatId();
+                String chatType = update.getMessage().getChat().getType();
                 if (messageText.startsWith("/")) {
                     log.info("Пользователь {} прислал команду: {}", userId, messageText);
+                    if (!"private".equals(chatType)){
+                        log.warn("Команды принимаются только в личных сообщениях! Пользователь {} прислал команду в чате типа: {}", userId, chatType);
+                        SendMessage warning = new SendMessage();
+                        warning.setChatId(chatId);
+                        warning.setText("❗️Команды можно использовать только в личных сообщениях с ботом.");
+                        warning.setMessageThreadId(update.getMessage().getMessageThreadId());
+                        Message sentWarning = this.execute(warning);
+
+                        new Thread(() -> {
+                            try {
+                                Thread.sleep(2000);
+                                DeleteMessage deleteCommand = new DeleteMessage();
+                                deleteCommand.setChatId(chatId);
+                                deleteCommand.setMessageId(update.getMessage().getMessageId());
+                                this.execute(deleteCommand);
+
+                                if (sentWarning != null) {
+                                    DeleteMessage deleteWarning = new DeleteMessage();
+                                    deleteWarning.setChatId(chatId);
+                                    deleteWarning.setMessageId(sentWarning.getMessageId());
+                                    this.execute(deleteWarning);
+                                }
+                            } catch (Exception e) {
+                                log.error("Ошибка при удалении сообщений после задержки: {}", e.getMessage(), e);
+                            }
+                        }).start();
+                        return;
+                    }
                     commandHandler.handleCommand(update, this);
                 } else {
                     log.info("Пользователь {} прислал сообщение: {}", userId, messageText);
