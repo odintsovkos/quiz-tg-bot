@@ -98,7 +98,6 @@ public class KeyboardFactory {
 			rows.add(Collections.singletonList(btn));
 		}
 
-		// Кнопки подтверждения и отмены
 		InlineKeyboardButton confirm = new InlineKeyboardButton("✅ Подтвердить");
 		confirm.setCallbackData("TOPIC_CONFIRM");
 		InlineKeyboardButton cancel = new InlineKeyboardButton("❌ Отмена");
