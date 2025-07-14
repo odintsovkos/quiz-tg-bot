@@ -48,8 +48,9 @@ public class MessageHandler {
 	private final TopicSelectionService topicSelectionService;
 	private final KeyboardFactory keyboardFactory;
 	private final QuestionService questionService;
+	private final BotSenderService botSenderService;
 
-	public MessageHandler(UserSessionService userSessionService, UserService userService, QuizService quizService, TopicService topicService, TopicSelectionService topicSelectionService, KeyboardFactory keyboardFactory, QuestionService questionService) {
+	public MessageHandler(UserSessionService userSessionService, UserService userService, QuizService quizService, TopicService topicService, TopicSelectionService topicSelectionService, KeyboardFactory keyboardFactory, QuestionService questionService, BotSenderService botSenderService) {
 		this.userSessionService = userSessionService;
 		this.userService = userService;
 		this.quizService = quizService;
@@ -57,12 +58,13 @@ public class MessageHandler {
 		this.topicSelectionService = topicSelectionService;
 		this.keyboardFactory = keyboardFactory;
 		this.questionService = questionService;
+		this.botSenderService = botSenderService;
 	}
 
 	/**
 	 * Обрабатывает любое не-командное сообщение пользователя.
 	 *
-	 * @param message сообщение Telegram
+	 * @param update состояние Telegram
 	 */
 	public void handleMessage(Update update, TelegramLongPollingBot bot) {
 		Message message = update.getMessage();
@@ -100,12 +102,12 @@ public class MessageHandler {
 		Question randomQuestion = questionService.findRandomQuestion();
 
 		if (randomQuestion == null) {
-			sendText(bot, chatId, threadID, "Нет доступных вопросов для показа.", keyboardFactory.mainMenu());
+			botSenderService.sendText(bot, chatId, threadID, "Нет доступных вопросов для показа.", keyboardFactory.mainMenu());
 			return;
 		}
 
 		logger.info("Отправляем случайный вопрос: {}", randomQuestion.getText());
-		sendPoll(bot, chatId, threadID, randomQuestion);
+		botSenderService.sendPoll(bot, chatId, threadID, randomQuestion);
 	}
 
 	/** Начало новой викторины */
@@ -119,12 +121,12 @@ public class MessageHandler {
 			Set<Long> selected = topicSelectionService.getSelectedTopics(user.getId());
 
 			if (topics.isEmpty()) {
-				sendText(bot, chatId, threadID, "Список тем пуст.", keyboardFactory.mainMenu());
+				botSenderService.sendText(bot, chatId, threadID, "Список тем пуст.", keyboardFactory.mainMenu());
 				return;
 			}
 			InlineKeyboardMarkup keyboard = keyboardFactory.topicMultiSelect(topics, selected);
 			String title = "Список тем:\nВыберите одну или несколько тем, затем нажмите 'Подтвердить'.";
-			sendText(bot, chatId, threadID, title, keyboard);
+			botSenderService.sendText(bot, chatId, threadID, title, keyboard);
 			selectedTopicIds = topicSelectionService.getSelectedTopics(user.getId());
 			userSessionService.updateState(user, State.QUIZ_ASKING);
 		}

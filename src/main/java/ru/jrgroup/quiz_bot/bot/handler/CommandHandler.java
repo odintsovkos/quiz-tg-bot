@@ -11,14 +11,12 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboard;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+import ru.jrgroup.quiz_bot.bot.QuizBot;
 import ru.jrgroup.quiz_bot.bot.keyboard.KeyboardFactory;
 import ru.jrgroup.quiz_bot.domain.Question;
 import ru.jrgroup.quiz_bot.domain.Topic;
 import ru.jrgroup.quiz_bot.domain.User;
-import ru.jrgroup.quiz_bot.service.QuestionService;
-import ru.jrgroup.quiz_bot.service.TopicSelectionService;
-import ru.jrgroup.quiz_bot.service.TopicService;
-import ru.jrgroup.quiz_bot.service.UserService;
+import ru.jrgroup.quiz_bot.service.*;
 
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -46,26 +44,27 @@ public class CommandHandler {
 	private final QuestionService questionService;
 	private final KeyboardFactory keyboardFactory;
 	private final TopicSelectionService topicSelectionService;
+	private final BotSenderService botSenderService;
 
 	public CommandHandler(
 			UserService userService,
 			TopicService topicService,
 			QuestionService questionService,
 			KeyboardFactory keyboardFactory,
-			TopicSelectionService topicSelectionService
+			TopicSelectionService topicSelectionService, BotSenderService botSenderService
 	) {
 		this.userService = userService;
 		this.topicService = topicService;
 		this.questionService = questionService;
 		this.keyboardFactory = keyboardFactory;
 		this.topicSelectionService = topicSelectionService;
+		this.botSenderService = botSenderService;
 	}
 
 	/**
 	 * Главная точка входа для обработки текстовых команд Telegram.
 	 *
 	 * @param update объект Telegram update
-	 * @param bot    экземпляр TelegramLongPollingBot
 	 */
 	public void handleCommand(Update update, TelegramLongPollingBot bot) {
 		Message message = update.getMessage();
@@ -97,7 +96,7 @@ public class CommandHandler {
 				Используйте /help для получения списка доступных команд.
 				
 				""";
-		sendText(bot, chatId, threadID, stringBuilder, keyboardFactory.mainMenu());
+		botSenderService.sendText(bot, chatId, threadID, stringBuilder, keyboardFactory.mainMenu());
 	}
 
 	/**
@@ -112,7 +111,7 @@ public class CommandHandler {
                 /question — получить случайный вопрос
                 /help — справка
                 """;
-		sendText(bot, chatId, threadID, help, keyboardFactory.mainMenu());
+		botSenderService.sendText(bot, chatId, threadID, help, keyboardFactory.mainMenu());
 	}
 
 	/**
@@ -122,7 +121,7 @@ public class CommandHandler {
 		List<User> users = userService.findAll();
 
 		if (users.isEmpty()) {
-			sendText(bot, chatId, threadID, "Нет зарегистрированных пользователей.", keyboardFactory.mainMenu());
+			botSenderService.sendText(bot, chatId, threadID, "Нет зарегистрированных пользователей.", keyboardFactory.mainMenu());
 			return;
 		}
 
@@ -146,7 +145,7 @@ public class CommandHandler {
 			));
 		}
 
-		sendText(bot, chatId, threadID, sb.toString(), keyboardFactory.mainMenu());
+		botSenderService.sendText(bot, chatId, threadID, sb.toString(), keyboardFactory.mainMenu());
 	}
 
 	/**
@@ -157,12 +156,12 @@ public class CommandHandler {
 		Set<Long> selected = topicSelectionService.getSelectedTopics(userId);
 
 		if (topics.isEmpty()) {
-			sendText(bot, chatId, threadID, "Список тем пуст.", keyboardFactory.mainMenu());
+			botSenderService.sendText(bot, chatId, threadID, "Список тем пуст.", keyboardFactory.mainMenu());
 			return;
 		}
 		InlineKeyboardMarkup keyboard = keyboardFactory.topicMultiSelect(topics, selected);
 		String title = "Список тем:\nВыберите одну или несколько тем, затем нажмите 'Подтвердить'.";
-		sendText(bot, chatId, threadID, title, keyboard);
+		botSenderService.sendText(bot, chatId, threadID, title, keyboard);
 	}
 
 	/**
@@ -171,10 +170,10 @@ public class CommandHandler {
 	private void handleQuestionCommand(Long chatId, Integer threadID, TelegramLongPollingBot bot) {
 		Question question = questionService.findRandomQuestion();
 		if (question == null) {
-			sendText(bot, chatId, threadID, "Вопросов не найдено.", keyboardFactory.mainMenu());
+			botSenderService.sendText(bot, chatId, threadID, "Вопросов не найдено.", keyboardFactory.mainMenu());
 			return;
 		}
-		sendPoll(bot, chatId, threadID, question);
+		botSenderService.sendPoll(bot, chatId, threadID, question);
 	}
 
 	/**
@@ -183,62 +182,6 @@ public class CommandHandler {
 	private void handleUnknownCommand(String command, Long chatId, Integer threadId, TelegramLongPollingBot bot) {
 		logger.warn("Неизвестная команда: {}", command);
 		String message = "Неизвестная команда: <b>" + command + "</b>\nИспользуйте /help для справки.";
-		sendText(bot, chatId, threadId, message, keyboardFactory.mainMenu());
-	}
-
-	/**
-	 * Универсальный метод для отправки текстовых сообщений.
-	 *
-	 * @param bot      бот
-	 * @param chatId   id чата
-	 * @param threadID id топика (для супергрупп)
-	 * @param text     текст
-	 * @param keyboard клавиатура (ReplyKeyboard или InlineKeyboardMarkup)
-	 */
-	private void sendText(TelegramLongPollingBot bot, Long chatId, Integer threadID, String text, ReplyKeyboard keyboard) {
-		SendMessage message = new SendMessage();
-		message.setChatId(chatId);
-		message.setText(text);
-		message.enableHtml(true);
-		if (threadID != null && threadID != 0) {
-			message.setMessageThreadId(threadID);
-		}
-		if (keyboard != null) {
-			message.setReplyMarkup(keyboard);
-		}
-
-		try {
-			bot.execute(message);
-			logger.debug("Сообщение успешно отправлено в чат {} (thread: {})", chatId, threadID);
-		} catch (Exception e) {
-			logger.error("Ошибка при отправке сообщения в чат {} с threadID {}: {}", chatId, threadID, e.getMessage(), e);
-		}
-	}
-
-	/**
-	 * Отправляет опрос (Poll) с вопросом.
-	 *
-	 * @param bot      бот
-	 * @param chatId   id чата
-	 * @param threadID id топика
-	 * @param question вопрос
-	 */
-	private void sendPoll(TelegramLongPollingBot bot, Long chatId, Integer threadID, Question question) {
-		SendPoll poll = SendPoll.builder()
-				.chatId(chatId.toString())
-				.question(question.getText())
-				.options(question.getOptions())
-				.isAnonymous(false)
-				.type("quiz")
-				.correctOptionId(question.getCorrectOption())
-				.messageThreadId(threadID)
-				.build();
-
-		try {
-			bot.execute(poll);
-			logger.debug("Опрос отправлен: '{}'", question.getText());
-		} catch (TelegramApiException e) {
-			logger.error("Ошибка при отправке опроса: {}", e.getMessage(), e);
-		}
+		botSenderService.sendText(bot, chatId, threadId, message, keyboardFactory.mainMenu());
 	}
 }
