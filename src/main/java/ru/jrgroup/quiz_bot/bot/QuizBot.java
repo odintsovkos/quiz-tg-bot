@@ -114,8 +114,7 @@ public class QuizBot extends TelegramLongPollingBot {
 
                 } else {
                     log.info("Пользователь {} прислал сообщение: {}", userId, messageText);
-
-                    // messageHandler.handleMessage(update);
+                    messageHandler.handleMessage(update, this);
                 }
             }
             else if (update.hasCallbackQuery()) {

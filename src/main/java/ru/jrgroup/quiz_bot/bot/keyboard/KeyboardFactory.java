@@ -36,12 +36,13 @@ public class KeyboardFactory {
 		List<KeyboardRow> rows = new ArrayList<>();
 
 		KeyboardRow row1 = new KeyboardRow();
-		row1.add(new KeyboardButton("Старт"));
-		row1.add(new KeyboardButton("Статистика"));
+		row1.add(new KeyboardButton("Начать викторину"));
+		row1.add(new KeyboardButton("Случайный вопрос"));
 		rows.add(row1);
 
 		KeyboardRow row2 = new KeyboardRow();
-		row2.add(new KeyboardButton("Помощь"));
+		row2.add(new KeyboardButton("Общий рейтинг"));
+		row2.add(new KeyboardButton("Мои результаты"));
 		rows.add(row2);
 
 		keyboard.setKeyboard(rows);

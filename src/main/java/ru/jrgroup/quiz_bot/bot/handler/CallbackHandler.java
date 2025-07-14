@@ -129,7 +129,7 @@ public class CallbackHandler {
 				: "Вы выбрали темы с ID: " + selected;
 
 		sendTextSilent(bot, chatId, msg);
-		topicSelectionService.clearSelection(userId);
+//		topicSelectionService.clearSelection(userId);
 
 		deleteMessageSilent(bot, chatId, messageId);
 	}

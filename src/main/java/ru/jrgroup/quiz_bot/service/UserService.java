@@ -105,8 +105,9 @@ public class UserService {
 	 * @param telegramId Telegram ID пользователя
 	 * @return Optional<User>
 	 */
-	public Optional<User> findByTelegramId(Long telegramId) {
+	public User findByTelegramId(Long telegramId) {
 		logger.debug("Поиск пользователя по Telegram ID: {}", telegramId);
-		return userRepository.findByTelegramId(telegramId);
+		return userRepository.findByTelegramId(telegramId)
+				.orElseThrow(() -> new IllegalArgumentException("Пользователь не найден: " + telegramId));
 	}
 }
