@@ -2,17 +2,22 @@ package ru.jrgroup.quiz_bot.bot;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
+import org.telegram.telegrambots.meta.api.methods.polls.SendPoll;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboard;
+import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ru.jrgroup.quiz_bot.bot.handler.CallbackHandler;
 import ru.jrgroup.quiz_bot.bot.handler.CommandHandler;
 import ru.jrgroup.quiz_bot.bot.handler.MessageHandler;
 import ru.jrgroup.quiz_bot.bot.handler.QuizHandler;
 import ru.jrgroup.quiz_bot.config.BotConfig;
+import ru.jrgroup.quiz_bot.domain.Question;
 
 /**
  * Главный класс Telegram-бота викторины.
@@ -30,34 +35,26 @@ import ru.jrgroup.quiz_bot.config.BotConfig;
 @Component
 public class QuizBot extends TelegramLongPollingBot {
 
-    private static final Logger log = LoggerFactory.getLogger(QuizBot.class);
+    private static final Logger logger = LoggerFactory.getLogger(QuizBot.class);
 
     private final BotConfig botConfig;
-    private final CommandHandler commandHandler;
-    private final MessageHandler messageHandler;
-    private final CallbackHandler callbackHandler;
-    private final QuizHandler quizHandler;
+    @Autowired
+    private CommandHandler commandHandler;
+    @Autowired
+    private MessageHandler messageHandler;
+    @Autowired
+    private CallbackHandler callbackHandler;
+    @Autowired
+    private QuizHandler quizHandler;
 
     /**
      * Конструктор QuizBot с внедрением зависимостей.
      *
      * @param botConfig       Конфигурация бота (токен, username и т.д.)
-     * @param commandHandler  Обработчик команд ("/start", "/help" и др.)
-     * @param messageHandler  Обработчик обычных сообщений
-     * @param callbackHandler Обработчик callback-запросов (inline-кнопки)
-     * @param quizHandler     Обработчик опросов и логики викторины
      */
-    public QuizBot(BotConfig botConfig,
-                   CommandHandler commandHandler,
-                   MessageHandler messageHandler,
-                   CallbackHandler callbackHandler,
-                   QuizHandler quizHandler) {
+    public QuizBot(BotConfig botConfig){
         this.botConfig = botConfig;
-        this.commandHandler = commandHandler;
-        this.messageHandler = messageHandler;
-        this.callbackHandler = callbackHandler;
-        this.quizHandler = quizHandler;
-        log.info("QuizBot инициализирован с username: {}", botConfig.getUsername());
+        logger.info("QuizBot инициализирован с username: {}", botConfig.getUsername());
     }
 
     /**
@@ -69,10 +66,10 @@ public class QuizBot extends TelegramLongPollingBot {
     @Override
     public void onUpdateReceived(Update update) {
         if (update == null) {
-            log.warn("Получено пустое update");
+            logger.warn("Получено пустое update");
             return;
         }
-        log.debug("Получено новое обновление: {}", update);
+        logger.debug("Получено новое обновление: {}", update);
 
         try {
             if (update.hasMessage() && update.getMessage().hasText()) {
@@ -82,10 +79,10 @@ public class QuizBot extends TelegramLongPollingBot {
                 String chatType = update.getMessage().getChat().getType();
 
                 if (messageText.startsWith("/")) {
-                    log.info("Пользователь {} прислал команду: {}", userId, messageText);
+                    logger.info("Пользователь {} прислал команду: {}", userId, messageText);
 
                     if (!"private".equals(chatType)) {
-                        log.warn("Команды принимаются только в личных сообщениях! Пользователь {} прислал команду в чате типа: {}", userId, chatType);
+                        logger.warn("Команды принимаются только в личных сообщениях! Пользователь {} прислал команду в чате типа: {}", userId, chatType);
 
                         SendMessage warning = SendMessage.builder()
                                 .chatId(chatId)
@@ -104,7 +101,7 @@ public class QuizBot extends TelegramLongPollingBot {
                                     this.execute(deleteWarning);
                                 }
                             } catch (Exception e) {
-                                log.error("Ошибка при удалении сообщений после задержки: {}", e.getMessage(), e);
+                                logger.error("Ошибка при удалении сообщений после задержки: {}", e.getMessage(), e);
                             }
                         }).start();
 
@@ -113,28 +110,28 @@ public class QuizBot extends TelegramLongPollingBot {
                     commandHandler.handleCommand(update, this);
 
                 } else {
-                    log.info("Пользователь {} прислал сообщение: {}", userId, messageText);
+                    logger.info("Пользователь {} прислал сообщение: {}", userId, messageText);
                     messageHandler.handleMessage(update, this);
                 }
             }
             else if (update.hasCallbackQuery()) {
                 String callbackData = update.getCallbackQuery().getData();
                 Long userId = update.getCallbackQuery().getFrom().getId();
-                log.info("Пользователь {} выбрал callback: {}", userId, callbackData);
+                logger.info("Пользователь {} выбрал callback: {}", userId, callbackData);
                 callbackHandler.handleCallback(update, this);
             }
             else if (update.hasMessage() && update.getMessage().hasPoll()) {
                 String pollQuestion = update.getMessage().getPoll().getQuestion();
                 Long userId = update.getMessage().getFrom().getId();
-                log.info("Пользователь {} прислал опрос: {}", userId, pollQuestion);
+                logger.info("Пользователь {} прислал опрос: {}", userId, pollQuestion);
 
                 // quizHandler.handlePoll(update);
             }
             else {
-                log.warn("Получено неподдерживаемое обновление: {}", update);
+                logger.warn("Получено неподдерживаемое обновление: {}", update);
             }
         } catch (Exception e) {
-            log.error("Ошибка при обработке обновления: {}", update, e);
+            logger.error("Ошибка при обработке обновления: {}", update, e);
         }
     }
 
@@ -145,7 +142,7 @@ public class QuizBot extends TelegramLongPollingBot {
      */
     @Override
     public String getBotUsername() {
-        log.debug("Запрошен username бота");
+        logger.debug("Запрошен username бота");
         return botConfig.getUsername();
     }
 
