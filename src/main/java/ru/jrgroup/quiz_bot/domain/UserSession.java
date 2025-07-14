@@ -5,6 +5,9 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * JPA-сущность "Сессия пользователя".
@@ -71,8 +74,9 @@ public class UserSession {
 	 * Текущее состояние пользователя (например, "IN_QUIZ", "WAITING_ANSWER").
 	 * Желательно использовать Enum, чтобы ограничить возможные значения.
 	 */
+	@Enumerated(EnumType.STRING)
 	@Column(nullable = false)
-	private String state;
+	private State state;
 
 	/**
 	 * Время последнего действия пользователя в рамках сессии.
@@ -94,11 +98,22 @@ public class UserSession {
 	 * @param state           состояние пользователя
 	 * @param lastActiveAt    время последнего действия
 	 */
-	public UserSession(User user, Quiz currentQuiz, Question currentQuestion, String state, LocalDateTime lastActiveAt) {
+	public UserSession(User user, Quiz currentQuiz, Question currentQuestion, State state, LocalDateTime lastActiveAt) {
 		this.user = user;
 		this.currentQuiz = currentQuiz;
 		this.currentQuestion = currentQuestion;
 		this.state = state;
 		this.lastActiveAt = lastActiveAt;
+	}
+
+	public Set<Long> getSelectedTopicIds() {
+		if (currentQuiz != null && currentQuiz.getQuestions() != null) {
+			return currentQuiz.getQuestions().stream()
+					.map(question -> question.getTopic())
+					.filter(Objects::nonNull)
+					.map(Topic::getId)
+					.collect(Collectors.toSet());
+		}
+		return Set.of();
 	}
 }

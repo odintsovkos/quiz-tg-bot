@@ -92,10 +92,12 @@ public class CommandHandler {
 	 * Обработка команды /start — приветствие и основное меню.
 	 */
 	private void handleStartCommand(Long chatId, Integer threadID, TelegramLongPollingBot bot) {
-		StringBuilder stringBuilder = new StringBuilder();
-		stringBuilder.append("Добро пожаловать в Quiz Bot!\n")
-				.append("Используйте /help для получения списка доступных команд.\n\n");
-		sendText(bot, chatId, threadID, stringBuilder.toString(), keyboardFactory.mainMenu());
+		String stringBuilder = """
+				Добро пожаловать в Quiz Bot!
+				Используйте /help для получения списка доступных команд.
+				
+				""";
+		sendText(bot, chatId, threadID, stringBuilder, keyboardFactory.mainMenu());
 	}
 
 	/**
