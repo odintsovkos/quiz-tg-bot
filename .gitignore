@@ -1,0 +1,30 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+.env
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+
+tools/_out/
+
+# Локальная копия документации 1С — в репозиторий не выкладывается.
+Документация/
+
+# Инструменты сборки банка вопросов работают только вместе с этой копией.
+tools/
+
+# Банк вопросов ведётся отдельно. В репозитории только формат и пример.
+data/questions/*
+!data/questions/README.md
+!data/questions/example/
+
+# Локальные настройки Claude Code.
+.claude/settings.local.json

@@ -1,0 +1,58 @@
+[project]
+name = "quizbot1c"
+version = "0.1.0"
+description = "Telegram-бот с викторинами по разработке на 1С"
+requires-python = ">=3.11"
+dependencies = [
+    "aiogram>=3.7",
+    "SQLAlchemy>=2.0",
+    "alembic>=1.13",
+    "aiosqlite>=0.20",
+    "apscheduler>=3.10,<4",
+    "pydantic-settings>=2.2",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "types-PyYAML",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["app", "tests"]
+# автогенерируемые ревизии Alembic не правим руками и не линтуем
+extend-exclude = ["migrations/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "RUF"]
+ignore = ["RUF001", "RUF002", "RUF003"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["app"]
+strict = true
+plugins = []
+
+[[tool.mypy.overrides]]
+module = ["apscheduler.*"]
+ignore_missing_imports = true
