@@ -35,3 +35,7 @@ AUTHORING.local.md
 
 # Инструкция по наполнению банка вопросов — только локально.
 AUTHORING.local.md
+
+# Спеки OpenSpec — рабочий процесс автора, в репозиторий не выкладываются.
+openspec/
+CLAUDE.local.md

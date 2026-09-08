@@ -3,14 +3,9 @@
 Telegram-бот с викторинами. Python + aiogram 3 + SQLite. Предметная область
 задаётся банком вопросов, в коде её нет.
 
-## Код бота (OpenSpec)
+## Код бота
 
-Бот написан и работает. Источник истины по поведению — `openspec/specs/`:
-шесть capability (`bot-core`, `private-quiz`, `group-quiz`, `admin-console`,
-`quiz-content`, `scoring-and-stats`). История закрытых изменений —
-в `openspec/changes/archive/`, незакрытые лежат рядом в `openspec/changes/`.
-
-Проверки перед сдачей работы: `python -m pytest -q`, `python -m mypy app`,
+Бот написан и работает. Проверки перед сдачей работы: `python -m pytest -q`, `python -m mypy app`,
 `python -m ruff check app tests`. Все три должны быть чистыми.
 
 Слои: `handlers → services → repositories → models`. Обработчик не ходит в БД
@@ -23,13 +18,6 @@ Telegram-бот с викторинами. Python + aiogram 3 + SQLite. Пред
 | `app/repositories/` | Доступ к данным |
 | `app/models/` | ORM-модели; `migrations/` — alembic |
 | `app/core/` | Конфигурация, движок БД, планировщик, логирование, время |
-
-### Как менять поведение
-
-Спеки ведут код, а не наоборот. Новая возможность — `/opsx:propose`, затем
-`/opsx:apply`, затем `/opsx:archive` (он же переносит дельты в `openspec/specs/`).
-Правка плана незакрытого изменения — `/opsx:update`. Артефакты руками
-в обход workflow не редактируются.
 
 ### Ключевые решения, чтобы не переспрашивать
 
