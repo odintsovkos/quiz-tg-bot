@@ -30,7 +30,7 @@ class Settings(BaseSettings):
 
     bot_token: str = Field(alias="BOT_TOKEN", min_length=1)
     owner_id: int = Field(alias="OWNER_ID")
-    db_path: Path = Field(default=Path("data/quizbot.sqlite3"), alias="DB_PATH")
+    db_path: Path = Field(default=Path("data/quiz.sqlite3"), alias="DB_PATH")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     default_timezone: str = Field(default="Europe/Moscow", alias="DEFAULT_TIMEZONE")
 

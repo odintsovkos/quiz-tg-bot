@@ -1,7 +1,7 @@
 [project]
-name = "quizbot1c"
+name = "quiz-tg-bot"
 version = "0.1.0"
-description = "Telegram-бот с викторинами по разработке на 1С"
+description = "Telegram-бот с викторинами: групповые опросы по расписанию и личные сессии"
 requires-python = ">=3.11"
 dependencies = [
     "aiogram>=3.7",

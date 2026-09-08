@@ -1,6 +1,7 @@
-# QuizBot1C
+# quiz-tg-bot
 
-Telegram-бот с викторинами по разработке на 1С. Python + aiogram 3 + SQLite.
+Telegram-бот с викторинами. Python + aiogram 3 + SQLite. Предметная область
+задаётся банком вопросов, в коде её нет.
 
 ## Код бота (OpenSpec)
 

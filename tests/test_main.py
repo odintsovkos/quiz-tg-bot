@@ -15,7 +15,7 @@ def make_settings(tmp_path) -> Settings:
     return Settings(
         BOT_TOKEN="123:fake",
         OWNER_ID=1,
-        DB_PATH=tmp_path / "quizbot.sqlite3",
+        DB_PATH=tmp_path / "quiz.sqlite3",
     )
 
 
@@ -117,7 +117,7 @@ def test_bad_token_gives_a_clear_message(monkeypatch, tmp_path, capsys):
 
     monkeypatch.setenv("BOT_TOKEN", "123:fake")
     monkeypatch.setenv("OWNER_ID", "1")
-    monkeypatch.setenv("DB_PATH", str(tmp_path / "quizbot.sqlite3"))
+    monkeypatch.setenv("DB_PATH", str(tmp_path / "quiz.sqlite3"))
     monkeypatch.chdir(tmp_path)
 
     def explode(coroutine):

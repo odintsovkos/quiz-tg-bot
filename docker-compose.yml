@@ -5,11 +5,11 @@ services:
     env_file: .env
     environment:
       # Путь внутри контейнера; на хосте это именованный том ниже.
-      DB_PATH: /data/quizbot.sqlite3
+      DB_PATH: /data/quiz.sqlite3
     volumes:
-      - quizbot-data:/data
+      - quiz-bot-data:/data
       # Банк вопросов монтируется отдельно, чтобы обновлять его без пересборки.
       - ./data/questions:/app/data/questions:ro
 
 volumes:
-  quizbot-data:
+  quiz-bot-data:

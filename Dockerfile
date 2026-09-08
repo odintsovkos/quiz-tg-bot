@@ -16,7 +16,7 @@ COPY data/questions ./data/questions
 RUN pip install --no-cache-dir .
 
 # Файл SQLite лежит на томе, поэтому переживает пересоздание контейнера.
-ENV DB_PATH=/data/quizbot.sqlite3
+ENV DB_PATH=/data/quiz.sqlite3
 VOLUME ["/data"]
 
 # Миграции применяются при старте: схема всегда соответствует образу.

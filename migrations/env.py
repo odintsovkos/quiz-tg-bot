@@ -29,7 +29,7 @@ def database_url() -> str:
     if db_path:
         return f"sqlite+aiosqlite:///{db_path}"
     configured = config.get_main_option("sqlalchemy.url", "")
-    return configured or "sqlite+aiosqlite:///data/quizbot.sqlite3"
+    return configured or "sqlite+aiosqlite:///data/quiz.sqlite3"
 
 
 def run_migrations_offline() -> None:
