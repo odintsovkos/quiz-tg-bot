@@ -26,5 +26,12 @@ data/questions/*
 !data/questions/README.md
 !data/questions/example/
 
-# Локальные настройки Claude Code.
-.claude/settings.local.json
+
+# Локальный тулинг Claude Code (команды и скиллы OpenSpec ставятся плагином).
+.claude/
+
+# Инструкция по наполнению банка вопросов — только локально.
+AUTHORING.local.md
+
+# Инструкция по наполнению банка вопросов — только локально.
+AUTHORING.local.md
