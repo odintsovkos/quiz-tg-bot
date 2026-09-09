@@ -28,6 +28,7 @@ from app.core.time import format_local, quiz_date, utc_now
 from app.models import AnswerSource, Question, QuizSession, User
 from app.repositories.sessions import SessionRepository
 from app.services.quiz.limits import LimitService
+from app.services.quiz.options import labelled_order
 from app.services.quiz.review import ReviewService
 from app.services.quiz.session import (
     QuizSessionService,
@@ -203,15 +204,21 @@ async def _send_current_question(
     question = await session.get(Question, item.question_id)
     if question is None:  # вопрос удалили между стартом сессии и выдачей
         return
+    # Порядок показа считается один раз: список в тексте и ряд кнопок под ним
+    # собираются из него же, поэтому буквы не могут разойтись с вариантами.
+    order = labelled_order(len(question.options), (quiz.id, item.position))
     await _feed(
         target,
         session,
         user,
         quiz,
-        texts.QUIZ_QUESTION.format(
-            number=item.position + 1, total=quiz.total_questions, text=question.text
+        texts.quiz_question_screen(
+            item.position + 1,
+            quiz.total_questions,
+            question.text,
+            texts.option_block(order, [option.text for option in question.options]),
         ),
-        keyboards.session_question(question, quiz.id, item.position),
+        keyboards.session_question(order, quiz.id, item.position),
     )
 
 
@@ -281,16 +288,12 @@ async def handle_session_answer(
 
 def feedback_text(recorded: RecordedAnswer, question: Question) -> str:
     """Верность, верный вариант при ошибке, пояснение и ссылка."""
-    if recorded.is_correct:
-        text = texts.ANSWER_CORRECT
-    else:
+    correct = None
+    if not recorded.is_correct:
         correct = question.options[question.correct_index].text
-        text = texts.ANSWER_WRONG.format(correct=correct)
-    if question.explanation:
-        text += texts.ANSWER_EXPLANATION.format(explanation=question.explanation)
-    if question.reference:
-        text += texts.ANSWER_REFERENCE.format(reference=question.reference)
-    return text
+    return texts.answer_feedback(
+        correct, question.explanation or "", question.reference or ""
+    )
 
 
 async def render_session_result(
@@ -403,7 +406,13 @@ async def send_random(target: Sender, session: AsyncSession, user: User) -> None
     if outcome.question is None or outcome.issue is None:  # pragma: no cover
         return
 
-    text = texts.RANDOM_QUESTION.format(text=outcome.question.text)
+    order = labelled_order(len(outcome.question.options), (outcome.issue.id,))
+    text = texts.random_question_screen(
+        outcome.question.text,
+        texts.option_block(
+            order, [option.text for option in outcome.question.options]
+        ),
+    )
     if outcome.topics_fell_back:
         # Отдельным сообщением предупреждение завело бы вторую ленту:
         # у случайного вопроса экран один.
@@ -414,7 +423,7 @@ async def send_random(target: Sender, session: AsyncSession, user: User) -> None
         session,
         user,
         text,
-        keyboards.random_question(outcome.question, outcome.issue.id),
+        keyboards.random_question(order, outcome.issue.id),
     )
 
 

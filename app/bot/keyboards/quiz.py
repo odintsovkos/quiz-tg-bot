@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -15,36 +17,41 @@ from app.bot.callbacks import (
     SessionAnswerCallback,
     TopicCallback,
 )
-from app.models import Question
-from app.services.quiz.options import display_order
 from app.services.quiz.topics import TopicGroup
 
 #: Сколько глав показывать на одной странице выбора тем.
 TOPICS_PAGE_SIZE = 8
 
-#: Буквы вариантов — участнику проще сослаться на «Б», чем на «второй».
-OPTION_LABELS = "АБВГДЕЁЖЗИ"
-
 
 def session_question(
-    question: Question, session_id: int, position: int
+    order: Sequence[tuple[str, int]], session_id: int, position: int
 ) -> InlineKeyboardMarkup:
+    """Ряд букв вариантов: сами варианты напечатаны в тексте сообщения.
+
+    Порядок показа приходит готовым — тем же, по которому собран список
+    в теле сообщения. В кнопке остаётся исходный номер варианта, поэтому
+    проверка ответа и разбор сессии работают как прежде.
+    """
     builder = InlineKeyboardBuilder()
-    # Перемешивается только порядок показа: в кнопке остаётся исходный номер
-    # варианта, поэтому проверка ответа и разбор сессии работают как прежде.
-    order = display_order(len(question.options), (session_id, position))
-    for label, index in zip(OPTION_LABELS, order, strict=False):
-        builder.button(
-            text=f"{label}. {question.options[index].text}",
-            callback_data=SessionAnswerCallback(
-                session_id=session_id, position=position, option=index
-            ),
+    builder.row(
+        *(
+            InlineKeyboardButton(
+                text=label,
+                callback_data=SessionAnswerCallback(
+                    session_id=session_id, position=position, option=index
+                ).pack(),
+            )
+            for label, index in order
         )
-    builder.button(
-        text="⏹ Прервать",
-        callback_data=SessionActionCallback(action="abort", session_id=session_id),
     )
-    builder.adjust(1)
+    builder.row(
+        InlineKeyboardButton(
+            text="⏹ Прервать",
+            callback_data=SessionActionCallback(
+                action="abort", session_id=session_id
+            ).pack(),
+        )
+    )
     return builder.as_markup()
 
 
@@ -112,15 +119,22 @@ def review_page(session_id: int, page: int, pages: int) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def random_question(question: Question, issue_id: int) -> InlineKeyboardMarkup:
+def random_question(
+    order: Sequence[tuple[str, int]], issue_id: int
+) -> InlineKeyboardMarkup:
+    """То же, что у вопроса сессии: буквы одним рядом, тексты — в сообщении."""
     builder = InlineKeyboardBuilder()
-    order = display_order(len(question.options), (issue_id,))
-    for label, index in zip(OPTION_LABELS, order, strict=False):
-        builder.button(
-            text=f"{label}. {question.options[index].text}",
-            callback_data=RandomAnswerCallback(issue_id=issue_id, option=index),
+    builder.row(
+        *(
+            InlineKeyboardButton(
+                text=label,
+                callback_data=RandomAnswerCallback(
+                    issue_id=issue_id, option=index
+                ).pack(),
+            )
+            for label, index in order
         )
-    builder.adjust(1)
+    )
     return builder.as_markup()
 
 

@@ -6,7 +6,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import time
+from html import escape
 
 # --- общее ---------------------------------------------------------------
 
@@ -60,12 +62,16 @@ COMMAND_DESCRIPTIONS: dict[str, str] = {
 
 # --- викторина -----------------------------------------------------------
 
-QUIZ_QUESTION = "<b>Вопрос {number} из {total}</b>\n\n{text}"
-RANDOM_QUESTION = "<b>Случайный вопрос</b>\n\n{text}"
+QUIZ_QUESTION = (
+    "<b>Вопрос {number} из {total}</b>\n\n<blockquote>{text}</blockquote>\n\n{options}"
+)
+RANDOM_QUESTION = (
+    "<b>Случайный вопрос</b>\n\n<blockquote>{text}</blockquote>\n\n{options}"
+)
 
-ANSWER_CORRECT = "✅ Верно!"
-ANSWER_WRONG = "❌ Неверно. Верный ответ: <b>{correct}</b>"
-ANSWER_EXPLANATION = "\n\n{explanation}"
+ANSWER_CORRECT = "✅ <b>Верно!</b>"
+ANSWER_WRONG = "❌ <b>Неверно</b>\n\nВерный ответ: <b>{correct}</b>"
+ANSWER_EXPLANATION = "\n\n<blockquote>{explanation}</blockquote>"
 ANSWER_REFERENCE = "\n\n<i>Источник: {reference}</i>"
 ANSWER_ALREADY_GIVEN = "На этот вопрос вы уже ответили."
 
@@ -248,3 +254,48 @@ def rank_label(rank: int) -> str:
     if 1 <= rank <= len(RANK_MEDALS):
         return RANK_MEDALS[rank - 1]
     return f"{rank}."
+
+
+def option_block(order: Sequence[tuple[str, int]], options: Sequence[str]) -> str:
+    """Список вариантов для тела сообщения: по строке на вариант.
+
+    Порядок и буквы приходят готовыми — теми же, по которым собран ряд кнопок.
+    Буква набирается жирным: ею же подписана кнопка под списком.
+    """
+    return "\n".join(
+        f"<b>{label}.</b> {escape(options[index])}" for label, index in order
+    )
+
+
+def quiz_question_screen(number: int, total: int, text: str, options: str) -> str:
+    """Экран вопроса сессии: шапка, вопрос в цитате, список вариантов."""
+    return QUIZ_QUESTION.format(
+        number=number, total=total, text=escape(text), options=options
+    )
+
+
+def random_question_screen(text: str, options: str) -> str:
+    """То же для одиночного случайного вопроса."""
+    return RANDOM_QUESTION.format(text=escape(text), options=options)
+
+
+def answer_feedback(correct: str | None, explanation: str, reference: str) -> str:
+    """Разбор ответа: вердикт, верный вариант при ошибке, пояснение, источник.
+
+    `correct` — текст верного варианта; `None`, если участник ответил верно.
+
+    Экранируется всё, что пришло из банка. Невалидная разметка отвергается
+    Telegram целиком, и экран-якорь застыл бы на прежнем содержимом, поэтому
+    подстановка сырого текста в разметку не допускается ни здесь, ни в
+    `option_block`, ни в экранах вопроса.
+    """
+    text = (
+        ANSWER_CORRECT
+        if correct is None
+        else ANSWER_WRONG.format(correct=escape(correct))
+    )
+    if explanation:
+        text += ANSWER_EXPLANATION.format(explanation=escape(explanation))
+    if reference:
+        text += ANSWER_REFERENCE.format(reference=escape(reference))
+    return text

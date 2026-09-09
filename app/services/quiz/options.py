@@ -15,6 +15,9 @@ import random
 #: Ключ выдачи: то, что однозначно определяет один показ вопроса.
 IssueKey = tuple[object, ...]
 
+#: Буквы вариантов — участнику проще сослаться на «Б», чем на «второй».
+OPTION_LABELS = "АБВГДЕЁЖЗИ"
+
 
 def display_order(count: int, key: IssueKey) -> list[int]:
     """Порядок показа как список исходных индексов вариантов.
@@ -35,3 +38,13 @@ def shuffled_order(count: int) -> list[int]:
     order = list(range(count))
     random.shuffle(order)
     return order
+
+
+def labelled_order(count: int, key: IssueKey) -> list[tuple[str, int]]:
+    """Порядок показа как пары «буква — исходный индекс варианта».
+
+    Буква назначается здесь и только здесь: список вариантов в тексте
+    сообщения и ряд кнопок под ним собираются из одного её вызова, поэтому
+    буква на кнопке не может разойтись со строкой списка.
+    """
+    return list(zip(OPTION_LABELS, display_order(count, key), strict=False))
