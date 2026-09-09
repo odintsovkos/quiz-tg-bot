@@ -4,18 +4,25 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from app.bot import texts
 from app.bot.callbacks import MenuCallback, RandomActionCallback, TopicCallback
-from app.bot.handlers.quiz import feedback_text, render_limits, render_session_result
+from app.bot.handlers.quiz import (
+    feedback_text,
+    handle_topic_button,
+    render_limits,
+    render_session_result,
+)
 from app.bot.keyboards.common import main_menu
 from app.bot.keyboards.quiz import TOPICS_PAGE_SIZE, topic_chapters, topic_groups
 from app.models import LimitMode, Question
 from app.services.quiz.limits import KIND_QUIZ, KIND_RANDOM, LimitService
 from app.services.quiz.session import QuizSessionService
-from app.services.quiz.topics import group_topics
+from app.services.quiz.topics import TopicPreferenceService, group_topics
 from app.services.settings import SettingsService
 from app.services.stats.scoring import RecordedAnswer
 from app.services.users import UserService
 from tests.conftest import make_question
+from tests.screen import ScreenBot, query
 
 MOMENT = datetime(2026, 3, 10, 12, 0, tzinfo=UTC)
 DEV = "Разработчик · Глава 8"
@@ -228,6 +235,40 @@ def test_group_screen_counts_the_chosen_chapters():
     assert "Разработчик — 1 из 1" in labels
     assert "Администратор — 0 из 1" in labels
     assert any("Все темы" in label for label in labels)
+    assert any("Сбросить" in label for label in labels)
+
+
+def test_all_topics_and_reset_stand_side_by_side():
+    groups = group_topics(["Разработчик · Тема А"])
+    row = next(
+        row
+        for row in topic_groups(groups, set()).inline_keyboard
+        if any(button.callback_data.startswith("tp:select_all:") for button in row)
+    )
+
+    assert [TopicCallback.unpack(button.callback_data).action for button in row] == [
+        "select_all",
+        "reset",
+    ]
+
+
+async def test_all_topics_button_marks_every_topic_and_reset_clears_them(session):
+    """«Все темы» отмечает банк целиком, соседняя кнопка снимает выбор."""
+    user = await setup(session, 1)
+    session.add(make_question("adm.001", "Администратор · Глава 2"))
+    await session.flush()
+    service = TopicPreferenceService(session)
+    bot = ScreenBot()
+
+    marked = query(bot)
+    await handle_topic_button(marked, TopicCallback(action="select_all"), session, user)
+    assert sorted(await service.selected(user.id)) == await service.available()
+    assert marked.answered == [(texts.TOPICS_ALL_SELECTED, False)]
+
+    cleared = query(bot)
+    await handle_topic_button(cleared, TopicCallback(action="reset"), session, user)
+    assert await service.selected(user.id) == []
+    assert cleared.answered == [(texts.TOPICS_RESET, False)]
 
 
 def test_long_topic_list_is_paginated_and_fits_the_markup_limit():

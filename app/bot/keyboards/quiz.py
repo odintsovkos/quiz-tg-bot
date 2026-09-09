@@ -159,9 +159,26 @@ def topic_groups(groups: list[TopicGroup], selected: set[str]) -> InlineKeyboard
             ),
             callback_data=TopicCallback(action="open", group=index),
         )
-    builder.button(text="♻️ Все темы", callback_data=TopicCallback(action="reset"))
-    builder.button(text="⬅️ В меню", callback_data=MenuCallback(action="root"))
     builder.adjust(1)
+    # «Все темы» отмечает весь банк, «Сбросить» снимает отметки: пустой выбор
+    # тоже означает все темы, но эти кнопки отвечают на разные вопросы —
+    # «хочу видеть выбранным всё» и «хочу начать выбор заново».
+    builder.row(
+        InlineKeyboardButton(
+            text="✅ Все темы",
+            callback_data=TopicCallback(action="select_all").pack(),
+        ),
+        InlineKeyboardButton(
+            text="♻️ Сбросить",
+            callback_data=TopicCallback(action="reset").pack(),
+        ),
+    )
+    builder.row(
+        InlineKeyboardButton(
+            text="⬅️ В меню",
+            callback_data=MenuCallback(action="root").pack(),
+        )
+    )
     return builder.as_markup()
 
 

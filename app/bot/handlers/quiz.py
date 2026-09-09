@@ -496,6 +496,9 @@ async def handle_topic_button(
     if action == "reset":
         await service.reset(user.id)
         await query.answer(texts.TOPICS_RESET)
+    elif action == "select_all":
+        await service.save(user.id, available)
+        await query.answer(texts.TOPICS_ALL_SELECTED)
     elif action == "all" and 0 <= callback_data.group < len(groups):
         categories = [item.category for item in groups[callback_data.group].items]
         # Кнопка одна: пока отмечено не всё — отмечаем, отмечено всё — снимаем.

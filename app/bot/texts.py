@@ -135,6 +135,7 @@ TOPICS_GROUP_ALL_SELECTED = "Отмечены все главы руководс
 TOPICS_GROUP_ALL_CLEARED = "Отметки со всех глав руководства сняты."
 TOPICS_PAGE_LABEL = "стр. {page} из {pages}"
 TOPICS_SAVED = "Выбор тем сохранён."
+TOPICS_ALL_SELECTED = "Отмечены все темы банка."
 TOPICS_RESET = "Выбор сброшен: используются все темы."
 TOPICS_EMPTY_BANK = "В банке пока нет активных вопросов."
 
