@@ -6,7 +6,11 @@ from datetime import UTC, datetime, time, timedelta
 from types import SimpleNamespace
 
 import pytest
-from aiogram.exceptions import TelegramForbiddenError
+from aiogram.exceptions import (
+    TelegramForbiddenError,
+    TelegramNetworkError,
+    TelegramRetryAfter,
+)
 from aiogram.methods import SendPoll
 
 from app.core.db import session_scope
@@ -15,7 +19,11 @@ from app.services.quiz.group import (
     ChatUnavailableError,
     GroupQuizService,
 )
-from app.services.quiz.schedule import ScheduleService, job_id
+from app.services.quiz.schedule import (
+    MISFIRE_GRACE_SECONDS,
+    ScheduleService,
+    job_id,
+)
 from app.services.quiz.selector import QuestionSelector
 from app.services.stats.reading import StatsService
 from app.services.users import UserService
@@ -29,13 +37,18 @@ ADMIN_CAT = "Администратор · Глава 2"
 class FakeBot:
     """Заглушка Telegram: тесты не ходят в сеть."""
 
-    def __init__(self, *, fail: bool = False) -> None:
+    def __init__(self, *, fail: bool = False, error: Exception | None = None) -> None:
         self.fail = fail
+        #: Отказ, который подставляется вместо стандартного «бот исключён»:
+        #: так тесты различают постоянную и временную недоступность.
+        self.error = error
         self.polls: list[dict] = []
         self.messages: list[tuple[int, str]] = []
         self._poll_counter = 0
 
     async def send_poll(self, **kwargs):
+        if self.error is not None:
+            raise self.error
         if self.fail:
             raise TelegramForbiddenError(
                 method=SendPoll(chat_id=kwargs["chat_id"], question="x", options=["a", "b"]),
@@ -325,7 +338,9 @@ async def test_rebuild_creates_a_job_per_active_chat(session_factory):
     count = await ScheduleService(scheduler, session_factory, FakeBot()).rebuild()
 
     assert count == 1
-    assert set(scheduler.jobs) == {job_id(-100)}
+    assert set(scheduler.jobs) == {
+        job_id(-100, time(hour, 0)) for hour in range(9, 21)
+    }
 
 
 async def test_job_does_not_catch_up_missed_runs(session_factory):
@@ -335,9 +350,9 @@ async def test_job_does_not_catch_up_missed_runs(session_factory):
     scheduler = FakeScheduler()
     await ScheduleService(scheduler, session_factory, FakeBot()).rebuild()
 
-    job = scheduler.jobs[job_id(-100)]
+    job = scheduler.jobs[job_id(-100, time(9, 0))]
     assert job["coalesce"] is True
-    assert job["misfire_grace_time"] == job["seconds"] == 3600
+    assert job["misfire_grace_time"] == MISFIRE_GRACE_SECONDS
 
 
 async def test_changing_the_interval_applies_immediately(session_factory):
@@ -346,12 +361,13 @@ async def test_changing_the_interval_applies_immediately(session_factory):
         chat = await add_chat(session)
         service = ScheduleService(scheduler, session_factory, FakeBot())
         service.apply(chat)
-        assert scheduler.jobs[job_id(-100)]["seconds"] == 3600
+        assert len(scheduler.jobs) == 12
 
         chat.interval_minutes = 30
         service.apply(chat)
 
-    assert scheduler.jobs[job_id(-100)]["seconds"] == 1800
+    assert len(scheduler.jobs) == 24
+    assert job_id(-100, time(9, 30)) in scheduler.jobs
 
 
 async def test_publication_inside_the_window_happens(session_factory):
@@ -366,19 +382,21 @@ async def test_publication_inside_the_window_happens(session_factory):
     assert len(bot.polls) == 1
 
 
-async def test_publication_outside_the_window_is_skipped_and_not_deferred(
-    session_factory,
-):
+async def test_no_moment_of_publication_falls_outside_the_window(session_factory):
+    """Вне окна не публикуется, потому что моментов там нет.
+
+    Раньше это держалось проверкой внутри задачи: сетка шла от момента
+    запуска процесса и попадала куда угодно, включая ночь.
+    """
+    scheduler = FakeScheduler()
     async with session_scope(session_factory) as session:
-        await add_questions(session, 1)
-        await add_chat(session)
+        chat = await add_chat(session)
+        ScheduleService(scheduler, session_factory, FakeBot()).apply(chat)
 
-    bot = FakeBot()
-    service = ScheduleService(FakeScheduler(), session_factory, bot)
-    at_night = datetime(2026, 3, 10, 23, 0, tzinfo=UTC)  # 02:00 MSK
+    hours = {job["hour"] for job in scheduler.jobs.values()}
 
-    assert await service.publish_scheduled(-100, now=at_night) is False
-    assert bot.polls == []
+    assert hours == set(range(9, 21))
+    assert not hours & {21, 22, 23, 0, 1, 2}
 
 
 async def test_paused_chat_is_not_published_to(session_factory):
@@ -403,11 +421,12 @@ async def test_manual_publication_does_not_touch_the_schedule(session_factory):
     service = ScheduleService(scheduler, session_factory, FakeBot())
     async with session_scope(session_factory) as session:
         service.apply(await _first_chat(session))
-    before = dict(scheduler.jobs[job_id(-100)])
+    before = dict(scheduler.jobs)
 
     assert await service.publish_now(-100, now=MOMENT) is True
 
-    assert scheduler.jobs[job_id(-100)] == before
+    assert scheduler.jobs == before
+    assert set(before) == {job_id(-100, time(hour, 0)) for hour in range(9, 21)}
     assert chat.id == -100
 
 
@@ -545,3 +564,92 @@ async def test_stored_correct_option_matches_the_published_order(session):
         stored = await session.get(GroupPoll, outcome.poll.poll_id)
         assert bot.polls[-1]["options"][stored.correct_option_id] == "Вариант 0"
         assert bot.polls[-1]["correct_option_id"] == stored.correct_option_id
+
+
+def network_error() -> TelegramNetworkError:
+    return TelegramNetworkError(
+        method=SendPoll(chat_id=-100, question="x", options=["a", "b"]),
+        message="Connection reset by peer",
+    )
+
+
+async def test_a_network_failure_keeps_the_chat_active(session_factory):
+    """Обрыв связи — не исключение бота из чата.
+
+    `TelegramNetworkError` — подкласс `TelegramAPIError`, и до разделения
+    отказов каждый сетевой сбой отключал чат вместе с его расписанием.
+    """
+    async with session_scope(session_factory) as session:
+        await add_questions(session, 1)
+        await add_chat(session)
+        await UserService(session).ensure_owner(1, now=MOMENT)
+
+    bot = FakeBot(error=network_error())
+    scheduler = FakeScheduler()
+    service = ScheduleService(scheduler, session_factory, bot)
+    async with session_scope(session_factory) as session:
+        service.apply(await _first_chat(session))
+
+    assert await service.publish_now(-100, now=MOMENT) is False
+
+    assert bot.messages == [], "администраторов зря побеспокоили"
+    async with session_factory() as session:
+        assert (await _first_chat(session)).is_active is True
+
+
+async def test_a_network_failure_leaves_the_schedule_in_place(session_factory):
+    async with session_scope(session_factory) as session:
+        await add_questions(session, 1)
+        await add_chat(session)
+
+    bot = FakeBot(error=network_error())
+    scheduler = FakeScheduler()
+    service = ScheduleService(scheduler, session_factory, bot)
+    async with session_scope(session_factory) as session:
+        service.apply(await _first_chat(session))
+    before = dict(scheduler.jobs)
+
+    await service.publish_scheduled(-100, now=MOMENT)
+
+    assert scheduler.jobs == before
+    assert set(before) == {job_id(-100, time(hour, 0)) for hour in range(9, 21)}
+
+
+async def test_the_next_moment_publishes_after_a_network_failure(session_factory):
+    """Пропущен только сбойный момент, а не автопубликация целиком."""
+    async with session_scope(session_factory) as session:
+        await add_questions(session, 2)
+        await add_chat(session)
+
+    bot = FakeBot(error=network_error())
+    service = ScheduleService(FakeScheduler(), session_factory, bot)
+
+    assert await service.publish_scheduled(-100, now=MOMENT) is False
+    assert bot.polls == []
+
+    bot.error = None
+    assert await service.publish_scheduled(-100, now=MOMENT) is True
+    assert len(bot.polls) == 1
+
+
+async def test_an_exhausted_rate_limit_does_not_deactivate_the_chat(session_factory):
+    """`send_with_retry` исчерпал попытки — момент пропущен, чат жив."""
+    async with session_scope(session_factory) as session:
+        await add_questions(session, 1)
+        await add_chat(session)
+        await UserService(session).ensure_owner(1, now=MOMENT)
+
+    bot = FakeBot(
+        error=TelegramRetryAfter(
+            method=SendPoll(chat_id=-100, question="x", options=["a", "b"]),
+            message="Too Many Requests",
+            retry_after=1,
+        )
+    )
+    service = ScheduleService(FakeScheduler(), session_factory, bot)
+
+    assert await service.publish_scheduled(-100, now=MOMENT) is False
+
+    assert bot.messages == []
+    async with session_factory() as session:
+        assert (await _first_chat(session)).is_active is True

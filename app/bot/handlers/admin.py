@@ -23,16 +23,14 @@ from app.bot.handlers.admin_users import show_admins
 from app.bot.keyboards import admin as keyboards
 from app.bot.routers import private_admin
 from app.bot.states import EditLimits, EditSchedule, EditSettings
+from app.core.config import Settings
 from app.core.db import SessionFactory
+from app.core.time import publication_slots
 from app.models import Chat, LimitMode, User
 from app.repositories.chats import ChatRepository
 from app.repositories.questions import QuestionRepository
 from app.services.admin import SummaryService
-from app.services.quiz.group import (
-    MAX_INTERVAL_MINUTES,
-    MIN_INTERVAL_MINUTES,
-    GroupQuizService,
-)
+from app.services.quiz.group import GroupQuizService
 from app.services.quiz.schedule import ScheduleService
 from app.services.settings import SettingsService, SettingsValidationError
 
@@ -145,6 +143,7 @@ async def handle_chat_action(
     scheduler: BaseScheduler,
     session_factory: SessionFactory,
     state: FSMContext,
+    settings: Settings,
 ) -> None:
     chats = ChatRepository(session)
     chat = await chats.get(callback_data.chat_id)
@@ -202,7 +201,8 @@ async def handle_chat_action(
             session,
             user,
             texts_admin.SCHEDULE_ASK_INTERVAL.format(
-                minimum=MIN_INTERVAL_MINUTES, maximum=MAX_INTERVAL_MINUTES
+                minimum=settings.min_interval_minutes,
+                maximum=settings.max_interval_minutes,
             ),
             keyboards.back(),
         )
@@ -273,16 +273,42 @@ async def _show_schedule(
             interval=chat.interval_minutes,
             window_start=texts.format_time(chat.window_start),
             window_end=texts.format_time(chat.window_end),
+            slots=render_slots(chat),
             categories=", ".join(chat.category_list) or texts_admin.CHAT_CATEGORIES_ALL,
         ),
         reply_markup=keyboards.schedule_actions(chat.id),
     )
 
 
-def parse_interval(raw: str) -> int:
-    """Разобрать периодичность; вне границ — отказ, прежнее значение остаётся."""
+#: Сколько моментов публикации показывать на экране расписания. При нижней
+#: границе периодичности их бывают сотни, а сообщение Telegram не резиновое.
+SLOTS_SHOWN = 12
+
+
+def render_slots(chat: Chat) -> str:
+    """Моменты публикации чата строкой — то, что видно в кабинете.
+
+    Считаются той же функцией, что и расписание в планировщике, поэтому
+    экран не может разойтись с тем, когда бот на самом деле публикует.
+    """
+    slots = publication_slots(
+        chat.window_start, chat.window_end, chat.interval_minutes
+    )
+    shown = ", ".join(texts.format_time(slot) for slot in slots[:SLOTS_SHOWN])
+    if len(slots) <= SLOTS_SHOWN:
+        return shown
+    return f"{shown} {texts_admin.SCHEDULE_SLOTS_TAIL.format(total=len(slots))}"
+
+
+def parse_interval(raw: str, minimum: int, maximum: int) -> int:
+    """Разобрать периодичность; вне границ — отказ, прежнее значение остаётся.
+
+    Границы приходят из конфигурации развёртывания, а не из констант кода:
+    их подбирают под чат, а верхняя вдобавок гарантирует, что вопрос уходит
+    хотя бы раз в сутки.
+    """
     value = int(raw.strip())
-    if not MIN_INTERVAL_MINUTES <= value <= MAX_INTERVAL_MINUTES:
+    if not minimum <= value <= maximum:
         raise ValueError(value)
     return value
 
@@ -311,16 +337,22 @@ async def handle_interval_input(
     bot: Bot,
     scheduler: BaseScheduler,
     session_factory: SessionFactory,
+    settings: Settings,
 ) -> None:
     try:
-        interval = parse_interval(message.text or "")
+        interval = parse_interval(
+            message.text or "",
+            settings.min_interval_minutes,
+            settings.max_interval_minutes,
+        )
     except ValueError:
         await replies.show(
             message,
             session,
             user,
             texts_admin.SCHEDULE_BAD_INTERVAL.format(
-                minimum=MIN_INTERVAL_MINUTES, maximum=MAX_INTERVAL_MINUTES
+                minimum=settings.min_interval_minutes,
+                maximum=settings.max_interval_minutes,
             ),
             keyboards.back(),
         )

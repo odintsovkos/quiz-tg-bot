@@ -8,12 +8,14 @@ import pytest
 
 from app.bot.callbacks import AdminCallback
 from app.bot.handlers.admin import (
+    SLOTS_SHOWN,
     WindowOrderError,
     parse_interval,
     parse_window,
     render_chat,
     render_limits,
     render_settings,
+    render_slots,
     render_summary,
 )
 from app.bot.handlers.admin_questions import (
@@ -108,14 +110,26 @@ async def test_paused_chat_card_says_so(session):
 # --- расписание ----------------------------------------------------------
 
 
+#: Границы по умолчанию: `MIN_INTERVAL_MINUTES` и `MAX_INTERVAL_MINUTES`.
+BOUNDS = (5, 24 * 60)
+
+
 def test_interval_is_parsed_within_bounds():
-    assert parse_interval(" 45 ") == 45
+    assert parse_interval(" 45 ", *BOUNDS) == 45
 
 
 @pytest.mark.parametrize("raw", ["0", "1", "2000", "не число", ""])
 def test_bad_interval_is_rejected(raw):
     with pytest.raises(ValueError):
-        parse_interval(raw)
+        parse_interval(raw, *BOUNDS)
+
+
+def test_interval_bounds_come_from_the_arguments():
+    """Границы приходят из конфигурации, а не из констант кода."""
+    assert parse_interval("30", 15, 120) == 30
+
+    with pytest.raises(ValueError):
+        parse_interval("30", 60, 120)
 
 
 def test_window_is_parsed():
@@ -438,3 +452,44 @@ async def test_admin_list_of_the_owner_alone_says_so(session):
     await service.ensure_owner(1, now=MOMENT)
 
     assert "Кроме владельца" in render_admins(await service.list_admins())
+
+
+async def test_schedule_screen_shows_the_moments_of_publication(session):
+    """Администратор должен видеть, когда бот публикует, а не только интервал."""
+    chat = await add_chat(session)
+
+    assert render_slots(chat) == "09:00, 12:00, 15:00, 18:00"
+
+
+async def test_the_moments_start_at_the_window_start(session):
+    chat = await add_chat(session)
+    chat.window_start = time(10, 30)
+    chat.interval_minutes = 240
+
+    assert render_slots(chat) == "10:30, 14:30, 18:30"
+
+
+async def test_a_long_list_of_moments_is_trimmed_with_a_total(session):
+    chat = await add_chat(session)
+    chat.interval_minutes = 15  # 48 момента в окне 09:00–21:00
+
+    text = render_slots(chat)
+
+    assert text.startswith("09:00, 09:15, 09:30")
+    assert "всего 48" in text
+    assert text.count(":") == SLOTS_SHOWN
+
+
+async def test_a_daily_interval_shows_a_single_moment(session):
+    chat = await add_chat(session)
+    chat.interval_minutes = 24 * 60
+
+    assert render_slots(chat) == "09:00"
+
+
+def test_the_rejection_names_the_configured_bounds():
+    from app.bot import texts_admin
+
+    text = texts_admin.SCHEDULE_BAD_INTERVAL.format(minimum=5, maximum=24 * 60)
+
+    assert "5" in text and "1440" in text

@@ -44,8 +44,11 @@ SCHEDULE_TITLE = (
     "<b>Расписание чата «{title}»</b>\n\n"
     "Периодичность: {interval} мин\n"
     "Окно активности: {window_start}–{window_end}\n"
+    "Публикации: {slots}\n"
     "Категории: {categories}"
 )
+#: Хвост списка моментов, когда все не помещаются на экран.
+SCHEDULE_SLOTS_TAIL = "… всего {total}"
 SCHEDULE_ASK_INTERVAL = (
     "Введите периодичность в минутах (от {minimum} до {maximum})."
 )

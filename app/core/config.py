@@ -10,8 +10,10 @@ from functools import lru_cache
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import Field, ValidationError, field_validator
+from pydantic import Field, ValidationError, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from app.core.time import MINUTES_IN_DAY
 
 
 class ConfigError(RuntimeError):
@@ -33,6 +35,27 @@ class Settings(BaseSettings):
     db_path: Path = Field(default=Path("data/quiz.sqlite3"), alias="DB_PATH")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     default_timezone: str = Field(default="Europe/Moscow", alias="DEFAULT_TIMEZONE")
+    min_interval_minutes: int = Field(default=5, alias="MIN_INTERVAL_MINUTES", ge=1)
+    max_interval_minutes: int = Field(
+        default=MINUTES_IN_DAY, alias="MAX_INTERVAL_MINUTES", le=MINUTES_IN_DAY
+    )
+    """Границы периодичности публикации, которые принимает кабинет.
+
+    Проверяются в паре и именно в этом порядке объявления: валидатор верхней
+    границы читает уже разобранную нижнюю через `info.data`. Модельный
+    валидатор здесь не годится — его ошибка приходит без имени поля,
+    и `load_settings` не смог бы назвать некорректный параметр.
+    """
+
+    @field_validator("max_interval_minutes")
+    @classmethod
+    def _check_interval_bounds(cls, value: int, info: ValidationInfo) -> int:
+        minimum = info.data.get("min_interval_minutes")
+        if minimum is not None and minimum > value:
+            raise ValueError(
+                "MAX_INTERVAL_MINUTES не может быть меньше MIN_INTERVAL_MINUTES"
+            )
+        return value
 
     @field_validator("log_level")
     @classmethod

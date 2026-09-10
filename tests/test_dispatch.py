@@ -8,7 +8,7 @@ aiogram: профиль и сессия БД должны попасть в да
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time
 
 import pytest
 from aiogram.types import CallbackQuery, Chat, Message, Update
@@ -88,7 +88,8 @@ async def test_group_connect_reaches_the_handler(
     async with session_scope(session_factory) as session:
         stored = await session.get(ChatModel, GROUP)
     assert stored is not None, "чат не подключился — событие не дошло до хендлера"
-    assert scheduler.get_job(job_id(GROUP)) is not None
+    # Первый момент публикации — начало окна активности нового чата.
+    assert scheduler.get_job(job_id(GROUP, time(9, 0))) is not None
     assert bot.sent, "участник не получил подтверждение"
 
 

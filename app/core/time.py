@@ -12,6 +12,15 @@ from zoneinfo import ZoneInfo
 
 DEFAULT_TIMEZONE = "Europe/Moscow"
 
+#: Суточный период сетки публикаций. Он же потолок для верхней границы
+#: периодичности: интервал больше суток не мог бы означать ничего, кроме
+#: «раз в день в начале окна».
+MINUTES_IN_DAY = 24 * 60
+
+
+def _minutes_of_day(moment: time) -> int:
+    return moment.hour * 60 + moment.minute
+
 
 def utc_now() -> datetime:
     """Текущий момент в UTC с явной таймзоной."""
@@ -65,6 +74,38 @@ def is_within_window(
     if start < end:
         return start <= local_time < end
     return local_time >= start or local_time < end
+
+
+def publication_slots(
+    window_start: time,
+    window_end: time,
+    interval_minutes: int,
+) -> list[time]:
+    """Моменты публикации внутри окна активности — времена суток.
+
+    Сетка отсчитывается от начала окна: первый момент приходится на само
+    начало, каждый следующий — на интервал позже, последним берётся момент
+    строго раньше окончания окна. Поэтому набор зависит только от настроек
+    чата и одинаков при любом времени запуска процесса.
+
+    Длительность окна считается по модулю суток, а нулевая означает
+    круглосуточное окно: одна формула покрывает и обычное окно `09:00–21:00`,
+    и равные границы, которые `is_within_window` уже трактует как
+    круглосуточные, и окно через полночь вроде `22:00–06:00`.
+    """
+    if interval_minutes <= 0:
+        raise ValueError("периодичность должна быть положительной")
+
+    start = _minutes_of_day(window_start)
+    span = (_minutes_of_day(window_end) - start) % MINUTES_IN_DAY or MINUTES_IN_DAY
+
+    slots: list[time] = []
+    offset = 0
+    while offset < span:
+        moment = (start + offset) % MINUTES_IN_DAY
+        slots.append(time(hour=moment // 60, minute=moment % 60))
+        offset += interval_minutes
+    return slots
 
 
 def format_local(

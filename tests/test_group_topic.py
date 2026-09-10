@@ -242,6 +242,9 @@ def _scheduler():
         def get_job(self, job_id):
             return None
 
+        def get_jobs(self):
+            return []
+
         def add_job(self, *args, **kwargs):
             return None
 

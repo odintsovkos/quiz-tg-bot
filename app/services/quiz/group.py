@@ -7,7 +7,12 @@ from dataclasses import dataclass
 from datetime import datetime, time
 
 from aiogram import Bot
-from aiogram.exceptions import TelegramAPIError
+from aiogram.exceptions import (
+    TelegramAPIError,
+    TelegramNetworkError,
+    TelegramRetryAfter,
+    TelegramServerError,
+)
 from aiogram.types import (
     ChatMemberAdministrator,
     ChatMemberOwner,
@@ -30,8 +35,6 @@ logger = get_logger(__name__)
 
 DEFAULT_INTERVAL_MINUTES = 180
 DEFAULT_WINDOW = (time(9, 0), time(21, 0))
-MIN_INTERVAL_MINUTES = 5
-MAX_INTERVAL_MINUTES = 24 * 60
 
 
 class ChatRightsError(RuntimeError):
@@ -44,6 +47,22 @@ class ChatRightsError(RuntimeError):
 
 class ChatUnavailableError(RuntimeError):
     """Публикация невозможна: бот исключён из чата или лишён прав."""
+
+
+class PublicationDeferredError(RuntimeError):
+    """Публикация не удалась по временной причине — Telegram недоступен.
+
+    Отдельный тип нужен потому, что `TelegramNetworkError`
+    и `TelegramServerError` — подклассы `TelegramAPIError`: без разделения
+    обрыв связи неотличим от исключения бота из чата, и чат отключался бы
+    от каждого сетевого сбоя.
+    """
+
+
+#: Отказы, которые говорят о недоступности Telegram, а не о правах бота.
+#: `TelegramRetryAfter` сюда попадает уже исчерпав попытки `send_with_retry`:
+#: упёршийся лимит частоты — тоже повод пропустить момент, а не отключить чат.
+DEFERRING_ERRORS = (TelegramNetworkError, TelegramServerError, TelegramRetryAfter)
 
 
 #: Обрывки ответов Telegram, по которым узнаётся недоступная тема форума.
@@ -204,6 +223,12 @@ class GroupQuizService:
         topic_lost = False
         try:
             message = await send(chat.topic_id)
+        except DEFERRING_ERRORS as error:
+            logger.warning(
+                "publication deferred",
+                extra={"chat_id": chat.id, "error": str(error)},
+            )
+            raise PublicationDeferredError(str(error)) from error
         except TelegramAPIError as error:
             if chat.topic_id is None or not is_topic_unavailable(error):
                 logger.warning(
@@ -222,6 +247,12 @@ class GroupQuizService:
             topic_lost = True
             try:
                 message = await send(None)
+            except DEFERRING_ERRORS as fallback_error:
+                logger.warning(
+                    "publication deferred",
+                    extra={"chat_id": chat.id, "error": str(fallback_error)},
+                )
+                raise PublicationDeferredError(str(fallback_error)) from fallback_error
             except TelegramAPIError as fallback_error:
                 logger.warning(
                     "chat unavailable",

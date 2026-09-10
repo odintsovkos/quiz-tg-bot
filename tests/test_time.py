@@ -1,9 +1,12 @@
 from datetime import UTC, date, datetime, time
 
+import pytest
+
 from app.core.time import (
     format_local,
     is_within_window,
     next_midnight,
+    publication_slots,
     quiz_date,
     to_timezone,
 )
@@ -66,3 +69,52 @@ def test_to_timezone_and_format():
     moment = utc(2026, 3, 10, 21, 0)
     assert to_timezone(moment, MSK).hour == 0
     assert format_local(moment, MSK) == "11.03.2026 00:00"
+
+
+def test_slots_start_at_the_window_start():
+    slots = publication_slots(time(9, 0), time(21, 0), 180)
+
+    assert slots == [time(9, 0), time(12, 0), time(15, 0), time(18, 0)]
+
+
+def test_slots_do_not_reach_the_window_end():
+    # 21:00 — граница окна, а не момент публикации: окно полуоткрыто.
+    assert time(21, 0) not in publication_slots(time(9, 0), time(21, 0), 60)
+
+
+def test_equal_window_bounds_mean_a_round_the_clock_grid():
+    slots = publication_slots(time(9, 0), time(9, 0), 180)
+
+    assert len(slots) == 8
+    assert slots[0] == time(9, 0)
+    assert slots[-1] == time(6, 0)
+
+
+def test_window_across_midnight_yields_slots_past_midnight():
+    slots = publication_slots(time(22, 0), time(6, 0), 120)
+
+    assert slots == [time(22, 0), time(0, 0), time(2, 0), time(4, 0)]
+
+
+def test_interval_longer_than_the_window_yields_a_single_slot():
+    slots = publication_slots(time(9, 0), time(21, 0), 900)
+
+    assert slots == [time(9, 0)]
+
+
+def test_daily_interval_publishes_once_a_day():
+    # Верхняя граница периодичности: чат получает вопрос раз в сутки.
+    slots = publication_slots(time(9, 0), time(21, 0), 24 * 60)
+
+    assert slots == [time(9, 0)]
+
+
+def test_uneven_interval_keeps_the_window_start_as_the_anchor():
+    slots = publication_slots(time(9, 0), time(12, 0), 50)
+
+    assert slots == [time(9, 0), time(9, 50), time(10, 40), time(11, 30)]
+
+
+def test_non_positive_interval_is_rejected():
+    with pytest.raises(ValueError):
+        publication_slots(time(9, 0), time(21, 0), 0)
