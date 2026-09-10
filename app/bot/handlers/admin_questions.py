@@ -384,7 +384,8 @@ def chat_categories_keyboard(
     )
     builder.row(
         InlineKeyboardButton(
-            text="⬅️ К чатам", callback_data=AdminCallback(section="chats").pack()
+            text="⬅️ К чату",
+            callback_data=AdminChatCallback(action="open", chat_id=chat.id).pack(),
         )
     )
     return builder
@@ -411,15 +412,17 @@ async def show_chat_categories(
         query,
         session,
         user,
-        texts_admin.SCHEDULE_TITLE.format(
-            title=chat.title,
-            interval=chat.interval_minutes,
-            window_start=chat.window_start.strftime("%H:%M"),
-            window_end=chat.window_end.strftime("%H:%M"),
-            categories=", ".join(sorted(chat.category_list))
-            or texts_admin.CHAT_CATEGORIES_ALL,
-        ),
+        render_chat_categories(chat),
         chat_categories_keyboard(chat, categories, page).as_markup(),
+    )
+
+
+def render_chat_categories(chat: Chat) -> str:
+    """Заголовок экрана выбора категорий."""
+    return texts_admin.CHAT_CATEGORIES_TITLE.format(
+        title=chat.title,
+        categories=", ".join(sorted(chat.category_list))
+        or texts_admin.CHAT_CATEGORIES_ALL,
     )
 
 

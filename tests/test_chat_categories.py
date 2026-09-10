@@ -14,6 +14,7 @@ from app.bot.handlers.admin_questions import (
     CATEGORIES_PAGE_SIZE,
     categories_page_count,
     chat_categories_keyboard,
+    render_chat_categories,
 )
 from app.models import Chat
 
@@ -110,3 +111,33 @@ def test_the_chat_card_offers_categories_directly():
     labels = buttons(markup)
     assert any("Категории" in label for label in labels)
     assert any("Расписание" in label for label in labels)
+
+
+def test_the_screen_names_the_chat_and_its_categories():
+    """Заголовок экрана собирается из данных чата и ничего не требует сверх.
+
+    Прежде он брал строку расписания, где есть ещё и моменты публикации,
+    и экран падал на невыданном `slots`.
+    """
+    categories = many_categories()
+
+    text = render_chat_categories(make_chat([categories[1], categories[0]]))
+
+    assert "Чат 1С" in text
+    assert f"{categories[0]}, {categories[1]}" in text
+
+
+def test_an_empty_selection_reads_as_all_categories():
+    text = render_chat_categories(make_chat())
+
+    assert "все" in text
+
+
+def test_the_schedule_menu_does_not_repeat_categories():
+    """Категории правят из карточки чата; в расписании речь только о времени."""
+    from app.bot.keyboards.admin import schedule_actions
+
+    labels = buttons(schedule_actions(-100))
+
+    assert not any("Категории" in label for label in labels)
+    assert any("Периодичность" in label for label in labels)

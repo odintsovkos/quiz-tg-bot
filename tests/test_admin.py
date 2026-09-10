@@ -14,6 +14,7 @@ from app.bot.handlers.admin import (
     parse_window,
     render_chat,
     render_limits,
+    render_schedule,
     render_settings,
     render_slots,
     render_summary,
@@ -459,6 +460,16 @@ async def test_schedule_screen_shows_the_moments_of_publication(session):
     chat = await add_chat(session)
 
     assert render_slots(chat) == "09:00, 12:00, 15:00, 18:00"
+
+
+async def test_the_schedule_screen_renders_whole(session):
+    """Экран собирается целиком: заголовок и его подстановки ходят вместе."""
+    chat = await add_chat(session)
+
+    text = render_schedule(chat)
+
+    assert "09:00, 12:00, 15:00, 18:00" in text
+    assert "180" in text
 
 
 async def test_the_moments_start_at_the_window_start(session):

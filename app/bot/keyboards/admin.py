@@ -76,8 +76,8 @@ def chat_actions(chat: Chat) -> InlineKeyboardMarkup:
         text="🗓 Расписание",
         callback_data=AdminChatCallback(action="schedule", chat_id=chat.id),
     )
-    # Категории доступны и из расписания, но там это третий тап от кабинета;
-    # набор тем правят чаще, чем окно активности.
+    # Категории живут здесь и только здесь: на экране расписания они были
+    # второй кнопкой к тому же экрану, а расписание — это про время.
     builder.button(
         text="📚 Категории",
         callback_data=AdminChatCallback(action="set_categories", chat_id=chat.id),
@@ -107,10 +107,9 @@ def schedule_actions(chat_id: int) -> InlineKeyboardMarkup:
         callback_data=AdminChatCallback(action="set_window", chat_id=chat_id),
     )
     builder.button(
-        text="📚 Категории",
-        callback_data=AdminChatCallback(action="set_categories", chat_id=chat_id),
+        text="⬅️ К чату",
+        callback_data=AdminChatCallback(action="open", chat_id=chat_id),
     )
-    builder.button(text="⬅️ К чатам", callback_data=AdminCallback(section="chats"))
     builder.adjust(1)
     return builder.as_markup()
 

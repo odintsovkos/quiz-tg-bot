@@ -268,15 +268,19 @@ async def _show_schedule(
         target,
         session,
         user,
-        texts_admin.SCHEDULE_TITLE.format(
-            title=chat.title,
-            interval=chat.interval_minutes,
-            window_start=texts.format_time(chat.window_start),
-            window_end=texts.format_time(chat.window_end),
-            slots=render_slots(chat),
-            categories=", ".join(chat.category_list) or texts_admin.CHAT_CATEGORIES_ALL,
-        ),
+        render_schedule(chat),
         reply_markup=keyboards.schedule_actions(chat.id),
+    )
+
+
+def render_schedule(chat: Chat) -> str:
+    return texts_admin.SCHEDULE_TITLE.format(
+        title=chat.title,
+        interval=chat.interval_minutes,
+        window_start=texts.format_time(chat.window_start),
+        window_end=texts.format_time(chat.window_end),
+        slots=render_slots(chat),
+        categories=", ".join(chat.category_list) or texts_admin.CHAT_CATEGORIES_ALL,
     )
 
 
