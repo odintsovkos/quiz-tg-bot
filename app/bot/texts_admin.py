@@ -56,6 +56,8 @@ SCHEDULE_ASK_WINDOW = "Введите окно активности в виде 
 SCHEDULE_INTERVAL_SAVED = "Периодичность изменена: раз в {interval} мин."
 SCHEDULE_WINDOW_SAVED = "Окно активности изменено: {window_start}–{window_end}."
 SCHEDULE_CATEGORIES_SAVED = "Набор категорий сохранён."
+CHAT_CATEGORIES_ALL_SELECTED = "Отмечены все категории банка."
+CHAT_CATEGORIES_RESET = "Выбор сброшен: беру вопросы из всех категорий."
 SCHEDULE_BAD_INTERVAL = (
     "Периодичность должна быть числом от {minimum} до {maximum} минут. "
     "Прежнее расписание сохранено."

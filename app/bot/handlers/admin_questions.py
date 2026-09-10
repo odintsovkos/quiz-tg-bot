@@ -374,13 +374,22 @@ def chat_categories_keyboard(
             ),
         )
 
+    # «Все категории» отмечает банк целиком, «Сбросить» снимает отметки:
+    # пустой набор тоже означает все категории, но кнопки отвечают на разные
+    # вопросы — «хочу видеть выбранным всё» и «хочу начать выбор заново».
     builder.row(
         InlineKeyboardButton(
-            text="♻️ Все категории",
+            text="✅ Все категории",
             callback_data=AdminChatCallback(
                 action="cat_all", chat_id=chat.id, page=page
             ).pack(),
-        )
+        ),
+        InlineKeyboardButton(
+            text="♻️ Сбросить",
+            callback_data=AdminChatCallback(
+                action="cat_reset", chat_id=chat.id, page=page
+            ).pack(),
+        ),
     )
     builder.row(
         InlineKeyboardButton(
@@ -428,6 +437,26 @@ def render_chat_categories(chat: Chat) -> str:
 
 class EmptyCategorySelection(ValueError):
     """В выбранном наборе категорий нет активных вопросов."""
+
+
+async def select_all_chat_categories(session: AsyncSession, chat: Chat) -> list[str]:
+    """Отметить все категории банка явным списком.
+
+    Пустой набор тоже означает «все», но на экране он выглядит как «ничего
+    не выбрано». Явный список отвечает администратору, который хочет видеть
+    банк отмеченным; цена — категория, добавленная в банк позже, в такой
+    набор не попадёт, пока её не отметят.
+    """
+    chat.set_categories(await chat_categories(session))
+    await session.flush()
+    return chat.category_list
+
+
+async def reset_chat_categories(session: AsyncSession, chat: Chat) -> list[str]:
+    """Снять отметки: пустой набор — вопросы из всех категорий."""
+    chat.set_categories([])
+    await session.flush()
+    return chat.category_list
 
 
 async def toggle_chat_category(

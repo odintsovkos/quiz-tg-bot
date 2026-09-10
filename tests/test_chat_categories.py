@@ -15,8 +15,11 @@ from app.bot.handlers.admin_questions import (
     categories_page_count,
     chat_categories_keyboard,
     render_chat_categories,
+    reset_chat_categories,
+    select_all_chat_categories,
 )
 from app.models import Chat
+from tests.conftest import make_question
 
 MOMENT = datetime(2026, 3, 10, 12, 0, tzinfo=UTC)
 
@@ -141,3 +144,44 @@ def test_the_schedule_menu_does_not_repeat_categories():
 
     assert not any("Категории" in label for label in labels)
     assert any("Периодичность" in label for label in labels)
+
+
+def test_all_categories_and_reset_stand_side_by_side():
+    """Экран чата отвечает на те же вопросы, что и выбор тем в личке."""
+    row = next(
+        row
+        for row in chat_categories_keyboard(make_chat(), many_categories(3))
+        .as_markup()
+        .inline_keyboard
+        if any("Сбросить" in button.text for button in row)
+    )
+
+    assert [
+        AdminChatCallback.unpack(button.callback_data).action for button in row
+    ] == ["cat_all", "cat_reset"]
+
+
+async def test_all_categories_marks_the_bank_and_reset_clears_it(session):
+    """«Все категории» отмечает банк целиком, соседняя кнопка снимает выбор."""
+    chat = make_chat()
+    session.add(make_question("dev.001", "Разработчик · Глава 8"))
+    session.add(make_question("adm.001", "Администратор · Глава 2"))
+    await session.flush()
+
+    assert await select_all_chat_categories(session, chat) == [
+        "Администратор · Глава 2",
+        "Разработчик · Глава 8",
+    ]
+    assert await reset_chat_categories(session, chat) == []
+
+
+async def test_a_deactivated_category_is_not_marked(session):
+    """Отмечается то же, что показано на экране, — категории с вопросами."""
+    chat = make_chat()
+    session.add(make_question("dev.001", "Разработчик · Глава 8"))
+    session.add(make_question("adm.001", "Администратор · Глава 2", is_active=False))
+    await session.flush()
+
+    assert await select_all_chat_categories(session, chat) == [
+        "Разработчик · Глава 8"
+    ]

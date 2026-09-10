@@ -15,6 +15,8 @@ from app.bot import replies, texts, texts_admin
 from app.bot.callbacks import AdminCallback, AdminChatCallback, AdminLimitCallback
 from app.bot.handlers.admin_questions import (
     EmptyCategorySelection,
+    reset_chat_categories,
+    select_all_chat_categories,
     show_chat_categories,
     show_questions,
     toggle_chat_category,
@@ -244,10 +246,15 @@ async def handle_chat_action(
         return
 
     if action == "cat_all":
-        chat.set_categories([])
-        await session.flush()
+        await select_all_chat_categories(session, chat)
         await show_chat_categories(query, session, user, chat, callback_data.page)
-        await query.answer(texts_admin.SCHEDULE_CATEGORIES_SAVED)
+        await query.answer(texts_admin.CHAT_CATEGORIES_ALL_SELECTED)
+        return
+
+    if action == "cat_reset":
+        await reset_chat_categories(session, chat)
+        await show_chat_categories(query, session, user, chat, callback_data.page)
+        await query.answer(texts_admin.CHAT_CATEGORIES_RESET)
         return
 
     if action.startswith("cat"):
