@@ -98,6 +98,27 @@ def test_the_whole_bank_fits_the_telegram_limit_on_both_levels():
     assert len(page.encode()) < 10_000
 
 
+def test_every_button_fits_the_callback_data_limit():
+    """Telegram отвергает callback-данные длиннее 64 байт.
+
+    Проверяется на худшем случае: настоящий идентификатор супергруппы,
+    последняя страница банка и трёхзначный индекс главы.
+    """
+    categories = many_categories()
+    chat = make_chat(categories)
+    chat.id = -1002895411698
+
+    markups = [
+        chat_category_groups(chat, group_topics(categories)),
+        chapters(chat, categories, page=categories_page_count(len(categories)) - 1),
+    ]
+
+    for markup in markups:
+        for row in markup.inline_keyboard:
+            for button in row:
+                assert len(button.callback_data.encode()) <= 64, button.callback_data
+
+
 def test_all_categories_and_reset_stand_side_by_side():
     """Экран чата отвечает на те же вопросы, что и выбор тем в личке."""
     markup = chat_category_groups(make_chat(), group_topics(many_categories(3)))
