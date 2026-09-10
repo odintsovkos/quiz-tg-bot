@@ -14,7 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.bot import replies, texts, texts_admin
 from app.bot.callbacks import AdminCallback, AdminChatCallback, AdminLimitCallback
 from app.bot.handlers.admin_questions import (
+    chat_categories,
     handle_chat_category_action,
+    render_category_summary,
     show_questions,
 )
 from app.bot.handlers.admin_users import show_admins
@@ -87,7 +89,7 @@ def render_topic(chat: Chat) -> str:
     return texts_admin.CHAT_TOPIC_NUMBERED.format(id=chat.topic_id)
 
 
-def render_chat(chat: Chat) -> str:
+def render_chat(chat: Chat, total: int) -> str:
     return texts_admin.CHAT_LINE.format(
         title=chat.title,
         state=(
@@ -99,7 +101,7 @@ def render_chat(chat: Chat) -> str:
         window_start=texts.format_time(chat.window_start),
         window_end=texts.format_time(chat.window_end),
         topic=render_topic(chat),
-        categories=", ".join(chat.category_list) or texts_admin.CHAT_CATEGORIES_ALL,
+        categories=render_category_summary(chat, total),
     ) + texts_admin.CHAT_TOPIC_HINT
 
 
@@ -126,8 +128,9 @@ async def _show_chats(
 async def _show_chat(
     target: replies.Sender, session: AsyncSession, user: User, chat: Chat
 ) -> None:
+    total = len(await chat_categories(session))
     await replies.show(
-        target, session, user, render_chat(chat), keyboards.chat_actions(chat)
+        target, session, user, render_chat(chat, total), keyboards.chat_actions(chat)
     )
 
 
@@ -253,7 +256,6 @@ def render_schedule(chat: Chat) -> str:
         window_start=texts.format_time(chat.window_start),
         window_end=texts.format_time(chat.window_end),
         slots=render_slots(chat),
-        categories=", ".join(chat.category_list) or texts_admin.CHAT_CATEGORIES_ALL,
     )
 
 

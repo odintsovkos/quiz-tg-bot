@@ -297,9 +297,9 @@ async def test_admins_are_told_when_the_branch_is_lost(session_factory):
 def test_the_chat_card_shows_the_branch():
     from app.bot.handlers.admin import render_chat
 
-    named = render_chat(make_chat(topic_id=42, topic_title="Викторина"))
-    numbered = render_chat(make_chat(topic_id=42))
-    general = render_chat(make_chat())
+    named = render_chat(make_chat(topic_id=42, topic_title="Викторина"), 0)
+    numbered = render_chat(make_chat(topic_id=42), 0)
+    general = render_chat(make_chat(), 0)
 
     assert "тема «Викторина»" in named
     assert "тема №42" in numbered
@@ -309,7 +309,7 @@ def test_the_chat_card_shows_the_branch():
 def test_the_card_explains_that_a_branch_is_set_from_the_topic():
     from app.bot.handlers.admin import render_chat
 
-    text = render_chat(make_chat())
+    text = render_chat(make_chat(), 0)
 
     assert "/topic" in text
     assert "не отдаёт список тем" in text

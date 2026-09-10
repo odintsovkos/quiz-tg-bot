@@ -92,7 +92,7 @@ def test_owner_also_sees_the_admins_section():
 async def test_chat_card_shows_state_and_schedule(session):
     chat = await add_chat(session)
 
-    text = render_chat(chat)
+    text = render_chat(chat, 12)
 
     assert "Чат 1С" in text
     assert "активен" in text
@@ -101,11 +101,22 @@ async def test_chat_card_shows_state_and_schedule(session):
     assert "все" in text
 
 
+async def test_the_card_sums_the_categories_up_instead_of_listing_them(session):
+    """Перечислением под сотню глав съели бы карточку целиком."""
+    chat = await add_chat(session)
+    chat.set_categories(["Разработчик · Глава 8", "Разработчик · Глава 9"])
+
+    text = render_chat(chat, 89)
+
+    assert "2 из 89" in text
+    assert "Глава 8" not in text
+
+
 async def test_paused_chat_card_says_so(session):
     chat = await add_chat(session)
     chat.is_active = False
 
-    assert "приостановлен" in render_chat(chat)
+    assert "приостановлен" in render_chat(chat, 0)
 
 
 # --- расписание ----------------------------------------------------------
@@ -470,6 +481,20 @@ async def test_the_schedule_screen_renders_whole(session):
 
     assert "09:00, 12:00, 15:00, 18:00" in text
     assert "180" in text
+
+
+async def test_the_schedule_screen_says_nothing_about_categories(session):
+    """Расписание — про время; набор категорий живёт на своём экране.
+
+    Перечислением отмеченных глав экран разрастался на всё сообщение.
+    """
+    chat = await add_chat(session)
+    chat.set_categories(["Разработчик · Глава 8"])
+
+    text = render_schedule(chat)
+
+    assert "Глава 8" not in text
+    assert "Категории" not in text
 
 
 async def test_the_moments_start_at_the_window_start(session):

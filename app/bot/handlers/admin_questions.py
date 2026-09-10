@@ -407,21 +407,23 @@ async def handle_chat_category_action(
 
 
 def render_chat_categories(chat: Chat, total: int) -> str:
-    """Заголовок первого уровня: чат и сводка по отмеченному.
+    """Заголовок первого уровня: чат и сводка по отмеченному."""
+    return texts_admin.CHAT_CATEGORIES_TITLE.format(
+        title=chat.title, categories=render_category_summary(chat, total)
+    )
 
-    Отмеченные не перечисляются: их бывает под сотню, и списком они съедают
-    сообщение целиком.
+
+def render_category_summary(chat: Chat, total: int) -> str:
+    """Отмеченные категории строкой — везде, где кабинет их называет.
+
+    Сводка, а не перечисление: отмеченных бывает под сотню, и списком они
+    съедают сообщение целиком.
     """
     selected = chat.category_list
-    return texts_admin.CHAT_CATEGORIES_TITLE.format(
-        title=chat.title,
-        categories=(
-            texts_admin.CHAT_CATEGORIES_COUNT.format(
-                selected=len(selected), total=total
-            )
-            if selected
-            else texts_admin.CHAT_CATEGORIES_ALL
-        ),
+    if not selected:
+        return texts_admin.CHAT_CATEGORIES_ALL
+    return texts_admin.CHAT_CATEGORIES_COUNT.format(
+        selected=len(selected), total=total
     )
 
 

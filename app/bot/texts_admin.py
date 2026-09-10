@@ -44,8 +44,7 @@ SCHEDULE_TITLE = (
     "<b>Расписание чата «{title}»</b>\n\n"
     "Периодичность: {interval} мин\n"
     "Окно активности: {window_start}–{window_end}\n"
-    "Публикации: {slots}\n"
-    "Категории: {categories}"
+    "Публикации: {slots}"
 )
 #: Хвост списка моментов, когда все не помещаются на экран.
 SCHEDULE_SLOTS_TAIL = "… всего {total}"
