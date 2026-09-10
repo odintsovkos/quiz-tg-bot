@@ -5,11 +5,10 @@ from __future__ import annotations
 from dataclasses import replace
 
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, InlineKeyboardButton, Message
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.bot import replies, texts, texts_admin
+from app.bot import replies, texts_admin
 from app.bot.callbacks import AdminCallback, AdminChatCallback, AdminQuestionCallback
 from app.bot.keyboards import admin as keyboards
 from app.bot.routers import private_admin
@@ -22,6 +21,7 @@ from app.services.admin import (
     QuestionValidationError,
     draft_from,
 )
+from app.services.content.categories import group_topics
 from app.services.content.validation import OptionDraft, QuestionDraft
 
 CORRECT_MARK = "*"
@@ -316,97 +316,25 @@ async def chat_categories(session: AsyncSession) -> list[str]:
     return await QuestionRepository(session).list_categories(only_active=True)
 
 
-#: Сколько категорий показывать на одной странице выбора.
-CATEGORIES_PAGE_SIZE = 8
-
-
-def categories_page_count(items: int) -> int:
-    """Сколько страниц занимает список; пустой список — одна страница."""
-    return max(1, -(-items // CATEGORIES_PAGE_SIZE))
-
-
-def chat_categories_keyboard(
-    chat: Chat, categories: list[str], page: int = 0
-) -> InlineKeyboardBuilder:
-    """Клавиатура выбора категорий чата страницей.
-
-    Страницы нужны не для красоты: под сотню категорий одним списком дают
-    разметку, которую Telegram отвергает как слишком длинную. Индекс
-    категории остаётся сквозным по всему списку, поэтому листание никак
-    не влияет на то, что означает нажатие.
-    """
-    pages = categories_page_count(len(categories))
-    page = max(0, min(page, pages - 1))
-    start = page * CATEGORIES_PAGE_SIZE
-
-    selected = set(chat.category_list)
-    builder = InlineKeyboardBuilder()
-    for index in range(start, min(start + CATEGORIES_PAGE_SIZE, len(categories))):
-        category = categories[index]
-        mark = "✅ " if category in selected else "▫️ "
-        builder.button(
-            text=f"{mark}{category}",
-            callback_data=AdminChatCallback(
-                action=f"cat{index}", chat_id=chat.id, page=page
-            ),
-        )
-    builder.adjust(1)
-
-    if pages > 1:
-        builder.row(
-            InlineKeyboardButton(
-                text="⬅️",
-                callback_data=AdminChatCallback(
-                    action="cat_page", chat_id=chat.id, page=(page - 1) % pages
-                ).pack(),
-            ),
-            InlineKeyboardButton(
-                text=texts.TOPICS_PAGE_LABEL.format(page=page + 1, pages=pages),
-                callback_data=AdminChatCallback(
-                    action="cat_noop", chat_id=chat.id, page=page
-                ).pack(),
-            ),
-            InlineKeyboardButton(
-                text="➡️",
-                callback_data=AdminChatCallback(
-                    action="cat_page", chat_id=chat.id, page=(page + 1) % pages
-                ).pack(),
-            ),
-        )
-
-    # «Все категории» отмечает банк целиком, «Сбросить» снимает отметки:
-    # пустой набор тоже означает все категории, но кнопки отвечают на разные
-    # вопросы — «хочу видеть выбранным всё» и «хочу начать выбор заново».
-    builder.row(
-        InlineKeyboardButton(
-            text="✅ Все категории",
-            callback_data=AdminChatCallback(
-                action="cat_all", chat_id=chat.id, page=page
-            ).pack(),
-        ),
-        InlineKeyboardButton(
-            text="♻️ Сбросить",
-            callback_data=AdminChatCallback(
-                action="cat_reset", chat_id=chat.id, page=page
-            ).pack(),
-        ),
-    )
-    builder.row(
-        InlineKeyboardButton(
-            text="⬅️ К чату",
-            callback_data=AdminChatCallback(action="open", chat_id=chat.id).pack(),
-        )
-    )
-    return builder
-
-
-async def show_chat_categories(
+async def handle_chat_category_action(
     query: CallbackQuery,
+    callback_data: AdminChatCallback,
     session: AsyncSession,
     user: User,
     chat: Chat,
-    page: int = 0,
 ) -> None:
+    """Экран категорий чата: два уровня, переключение не уводит со страницы.
+
+    Кнопки и навигация те же, что у выбора тем в личке, — раскладка по
+    руководствам общая (`group_topics`). Разница в правилах, и она нарочная:
+    набор без активных вопросов кабинет отклоняет, а участнику молча
+    подставляет все темы.
+    """
+    action = callback_data.action
+    if action == "cat_noop":  # счётчик страниц — подпись, а не кнопка
+        await query.answer()
+        return
+
     categories = await chat_categories(session)
     if not categories:
         await replies.show(
@@ -416,22 +344,84 @@ async def show_chat_categories(
             texts_admin.SCHEDULE_EMPTY_CATEGORIES,
             keyboards.back(),
         )
+        await query.answer()
         return
+
+    groups = group_topics(categories)
+    group_index = callback_data.group
+
+    if action == "cat_all":
+        await select_all_chat_categories(session, chat)
+        await query.answer(texts_admin.CHAT_CATEGORIES_ALL_SELECTED)
+    elif action == "cat_reset":
+        await reset_chat_categories(session, chat)
+        await query.answer(texts_admin.CHAT_CATEGORIES_RESET)
+    elif action == "cat_group_all" and 0 <= group_index < len(groups):
+        try:
+            chosen = await set_chat_category_group(
+                session, chat, [item.category for item in groups[group_index].items]
+            )
+        except EmptyCategorySelection:
+            await query.answer(texts_admin.SCHEDULE_EMPTY_CATEGORIES, show_alert=True)
+            return
+        await query.answer(
+            texts_admin.CHAT_CATEGORIES_GROUP_ALL_SELECTED
+            if chosen
+            else texts_admin.CHAT_CATEGORIES_GROUP_ALL_CLEARED
+        )
+    elif action == "cat_toggle":
+        try:
+            await toggle_chat_category(session, chat, callback_data.index)
+        except EmptyCategorySelection:
+            # Ничего не изменилось — экран уже показывает верное состояние.
+            await query.answer(texts_admin.SCHEDULE_EMPTY_CATEGORIES, show_alert=True)
+            return
+        await query.answer(texts_admin.SCHEDULE_CATEGORIES_SAVED)
+    else:
+        await query.answer()
+
+    stay_in_group = (
+        action in {"cat_open", "cat_toggle", "cat_group_all"}
+        and 0 <= group_index < len(groups)
+    )
+    if not stay_in_group:
+        await replies.show(
+            query,
+            session,
+            user,
+            render_chat_categories(chat, len(categories)),
+            keyboards.chat_category_groups(chat, groups),
+        )
+        return
+
+    group = groups[group_index]
     await replies.show(
         query,
         session,
         user,
-        render_chat_categories(chat),
-        chat_categories_keyboard(chat, categories, page).as_markup(),
+        texts_admin.CHAT_CATEGORIES_GROUP_TITLE.format(
+            group=group.name, title=chat.title
+        ),
+        keyboards.chat_category_chapters(chat, group_index, group, callback_data.page),
     )
 
 
-def render_chat_categories(chat: Chat) -> str:
-    """Заголовок экрана выбора категорий."""
+def render_chat_categories(chat: Chat, total: int) -> str:
+    """Заголовок первого уровня: чат и сводка по отмеченному.
+
+    Отмеченные не перечисляются: их бывает под сотню, и списком они съедают
+    сообщение целиком.
+    """
+    selected = chat.category_list
     return texts_admin.CHAT_CATEGORIES_TITLE.format(
         title=chat.title,
-        categories=", ".join(sorted(chat.category_list))
-        or texts_admin.CHAT_CATEGORIES_ALL,
+        categories=(
+            texts_admin.CHAT_CATEGORIES_COUNT.format(
+                selected=len(selected), total=total
+            )
+            if selected
+            else texts_admin.CHAT_CATEGORIES_ALL
+        ),
     )
 
 
@@ -457,6 +447,27 @@ async def reset_chat_categories(session: AsyncSession, chat: Chat) -> list[str]:
     chat.set_categories([])
     await session.flush()
     return chat.category_list
+
+
+async def set_chat_category_group(
+    session: AsyncSession, chat: Chat, categories: list[str]
+) -> bool:
+    """Отметить или снять сразу все главы руководства; вернуть, что сделано.
+
+    Кнопка одна: пока отмечено не всё — отмечаем, отмечено всё — снимаем.
+    Отметки в других руководствах не трогаются.
+    """
+    available = await chat_categories(session)
+    selected = set(chat.category_list)
+    chosen = not set(categories) <= selected
+    selected = selected | set(categories) if chosen else selected - set(categories)
+
+    if selected and not selected & set(available):
+        raise EmptyCategorySelection(categories)
+
+    chat.set_categories(sorted(selected))
+    await session.flush()
+    return chosen
 
 
 async def toggle_chat_category(

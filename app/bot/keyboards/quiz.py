@@ -17,7 +17,7 @@ from app.bot.callbacks import (
     SessionAnswerCallback,
     TopicCallback,
 )
-from app.services.quiz.topics import TopicGroup
+from app.services.content.categories import TopicGroup
 
 #: Сколько глав показывать на одной странице выбора тем.
 TOPICS_PAGE_SIZE = 8

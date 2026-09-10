@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from aiogram.types import InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.bot import texts_admin
 from app.bot.callbacks import (
     AdminCallback,
     AdminChatCallback,
@@ -13,6 +14,7 @@ from app.bot.callbacks import (
     AdminUserCallback,
 )
 from app.models import Chat, LimitMode, Question, User, UserRole
+from app.services.content.categories import TopicGroup
 
 SECTION_TITLES = {
     "chats": "💬 Чаты",
@@ -111,6 +113,151 @@ def schedule_actions(chat_id: int) -> InlineKeyboardMarkup:
         callback_data=AdminChatCallback(action="open", chat_id=chat_id),
     )
     builder.adjust(1)
+    return builder.as_markup()
+
+
+#: Сколько глав руководства показывать на одной странице выбора.
+CATEGORIES_PAGE_SIZE = 8
+
+
+def categories_page_count(items: int) -> int:
+    """Сколько страниц занимает список; пустой список — одна страница."""
+    return max(1, -(-items // CATEGORIES_PAGE_SIZE))
+
+
+def chat_category_groups(
+    chat: Chat, groups: list[TopicGroup]
+) -> InlineKeyboardMarkup:
+    """Первый уровень выбора категорий: руководства и число отмеченных глав.
+
+    Экран собран как выбор тем в личке: плоским списком администратор листал
+    страницы всего банка, чтобы собрать одно руководство.
+    """
+    selected = set(chat.category_list)
+    builder = InlineKeyboardBuilder()
+    for index, group in enumerate(groups):
+        chosen = sum(1 for item in group.items if item.category in selected)
+        builder.button(
+            text=texts_admin.CHAT_CATEGORIES_GROUP_BUTTON.format(
+                name=group.name, selected=chosen, total=len(group.items)
+            ),
+            callback_data=AdminChatCallback(
+                action="cat_open", chat_id=chat.id, group=index
+            ),
+        )
+    builder.adjust(1)
+    # «Все категории» отмечает банк целиком, «Сбросить» снимает отметки:
+    # пустой набор тоже означает все категории, но кнопки отвечают на разные
+    # вопросы — «хочу видеть выбранным всё» и «хочу начать выбор заново».
+    builder.row(
+        InlineKeyboardButton(
+            text="✅ Все категории",
+            callback_data=AdminChatCallback(
+                action="cat_all", chat_id=chat.id
+            ).pack(),
+        ),
+        InlineKeyboardButton(
+            text="♻️ Сбросить",
+            callback_data=AdminChatCallback(
+                action="cat_reset", chat_id=chat.id
+            ).pack(),
+        ),
+    )
+    builder.row(
+        InlineKeyboardButton(
+            text="⬅️ К чату",
+            callback_data=AdminChatCallback(action="open", chat_id=chat.id).pack(),
+        )
+    )
+    return builder.as_markup()
+
+
+def chat_category_chapters(
+    chat: Chat, group_index: int, group: TopicGroup, page: int = 0
+) -> InlineKeyboardMarkup:
+    """Второй уровень: главы одного руководства страницей.
+
+    Страницы нужны не для красоты: под сотню категорий одним списком дают
+    разметку, которую Telegram отвергает как слишком длинную. Индекс главы
+    сквозной по всему банку, поэтому ни листание, ни переход между
+    руководствами не меняют смысла нажатия.
+    """
+    pages = categories_page_count(len(group.items))
+    page = max(0, min(page, pages - 1))
+    start = page * CATEGORIES_PAGE_SIZE
+
+    selected = set(chat.category_list)
+    builder = InlineKeyboardBuilder()
+    for item in group.items[start : start + CATEGORIES_PAGE_SIZE]:
+        mark = "✅ " if item.category in selected else "▫️ "
+        builder.button(
+            text=f"{mark}{item.title}",
+            callback_data=AdminChatCallback(
+                action="cat_toggle",
+                chat_id=chat.id,
+                group=group_index,
+                index=item.index,
+                page=page,
+            ),
+        )
+    builder.adjust(1)
+
+    all_chosen = all(item.category in selected for item in group.items)
+    builder.row(
+        InlineKeyboardButton(
+            text="◻️ Снять все" if all_chosen else "✅ Выбрать все",
+            callback_data=AdminChatCallback(
+                action="cat_group_all",
+                chat_id=chat.id,
+                group=group_index,
+                page=page,
+            ).pack(),
+        )
+    )
+
+    if pages > 1:
+        builder.row(
+            InlineKeyboardButton(
+                text="⬅️",
+                callback_data=AdminChatCallback(
+                    action="cat_open",
+                    chat_id=chat.id,
+                    group=group_index,
+                    page=(page - 1) % pages,
+                ).pack(),
+            ),
+            InlineKeyboardButton(
+                text=texts_admin.CHAT_CATEGORIES_PAGE_LABEL.format(
+                    page=page + 1, pages=pages
+                ),
+                callback_data=AdminChatCallback(
+                    action="cat_noop", chat_id=chat.id, page=page
+                ).pack(),
+            ),
+            InlineKeyboardButton(
+                text="➡️",
+                callback_data=AdminChatCallback(
+                    action="cat_open",
+                    chat_id=chat.id,
+                    group=group_index,
+                    page=(page + 1) % pages,
+                ).pack(),
+            ),
+        )
+
+    # Уйти к чату можно с любой страницы глав, не листая назад.
+    builder.row(
+        InlineKeyboardButton(
+            text="⬅️ К руководствам",
+            callback_data=AdminChatCallback(
+                action="cat_groups", chat_id=chat.id
+            ).pack(),
+        ),
+        InlineKeyboardButton(
+            text="🏠 К чату",
+            callback_data=AdminChatCallback(action="open", chat_id=chat.id).pack(),
+        ),
+    )
     return builder.as_markup()
 
 

@@ -56,8 +56,6 @@ SCHEDULE_ASK_WINDOW = "Введите окно активности в виде 
 SCHEDULE_INTERVAL_SAVED = "Периодичность изменена: раз в {interval} мин."
 SCHEDULE_WINDOW_SAVED = "Окно активности изменено: {window_start}–{window_end}."
 SCHEDULE_CATEGORIES_SAVED = "Набор категорий сохранён."
-CHAT_CATEGORIES_ALL_SELECTED = "Отмечены все категории банка."
-CHAT_CATEGORIES_RESET = "Выбор сброшен: беру вопросы из всех категорий."
 SCHEDULE_BAD_INTERVAL = (
     "Периодичность должна быть числом от {minimum} до {maximum} минут. "
     "Прежнее расписание сохранено."
@@ -81,8 +79,23 @@ SCHEDULE_EMPTY_CATEGORIES = (
 CHAT_CATEGORIES_TITLE = (
     "<b>Категории чата «{title}»</b>\n\n"
     "Сейчас беру вопросы: {categories}\n\n"
-    "Отметьте категории, из которых публиковать."
+    "Выберите руководство, затем отметьте нужные главы. "
+    "Если не отмечено ничего — беру вопросы из всех категорий."
 )
+CHAT_CATEGORIES_GROUP_TITLE = (
+    "<b>{group}</b>\n\n"
+    "Чат «{title}»: отметьте главы, по которым публиковать вопросы. "
+    "Выбор сохраняется сразу."
+)
+#: Сводка вместо перечисления: отмеченных бывает под сотню, и списком
+#: они съедают всё сообщение.
+CHAT_CATEGORIES_COUNT = "{selected} из {total}"
+CHAT_CATEGORIES_GROUP_BUTTON = "{name} — {selected} из {total}"
+CHAT_CATEGORIES_PAGE_LABEL = "стр. {page} из {pages}"
+CHAT_CATEGORIES_ALL_SELECTED = "Отмечены все категории банка."
+CHAT_CATEGORIES_RESET = "Выбор сброшен: беру вопросы из всех категорий."
+CHAT_CATEGORIES_GROUP_ALL_SELECTED = "Отмечены все главы руководства."
+CHAT_CATEGORIES_GROUP_ALL_CLEARED = "Отметки со всех глав руководства сняты."
 
 # --- вопросы -------------------------------------------------------------
 

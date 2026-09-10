@@ -27,6 +27,7 @@ from app.bot.routers import private_user
 from app.core.time import format_local, quiz_date, utc_now
 from app.models import AnswerSource, Question, QuizSession, User
 from app.repositories.sessions import SessionRepository
+from app.services.content.categories import group_topics
 from app.services.quiz.limits import LimitService
 from app.services.quiz.options import labelled_order
 from app.services.quiz.review import ReviewService
@@ -35,7 +36,7 @@ from app.services.quiz.session import (
     RandomOutcome,
     StartOutcome,
 )
-from app.services.quiz.topics import TopicPreferenceService, group_topics
+from app.services.quiz.topics import TopicPreferenceService
 from app.services.settings import SettingsService
 from app.services.stats.reading import PERIOD_TODAY, StatsService
 from app.services.stats.scoring import RecordedAnswer, is_counted

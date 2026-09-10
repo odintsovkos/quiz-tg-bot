@@ -15,49 +15,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import UserTopicPreference
 from app.repositories.questions import QuestionRepository
-from app.services.content.loader import CATEGORY_SEPARATOR
-
-#: Группа для категорий без префикса руководства.
-GROUP_OTHER = "Прочее"
-
-
-@dataclass(frozen=True, slots=True)
-class TopicItem:
-    """Одна глава на экране выбора."""
-
-    #: Позиция в общем списке доступных тем — ею адресуется кнопка.
-    index: int
-    #: Название главы без префикса руководства: префикс уже в заголовке группы.
-    title: str
-    category: str
-
-
-@dataclass(frozen=True, slots=True)
-class TopicGroup:
-    """Руководство и его главы."""
-
-    name: str
-    items: tuple[TopicItem, ...]
-
-
-def group_topics(available: list[str]) -> list[TopicGroup]:
-    """Разложить темы по руководствам, сохранив общие индексы.
-
-    Экран со всеми темами сразу не помещается в лимит Telegram на размер
-    клавиатуры, поэтому выбор двухуровневый. Индекс остаётся общим: кнопка
-    по-прежнему адресует тему позицией в списке `available`.
-    """
-    order: list[str] = []
-    items: dict[str, list[TopicItem]] = {}
-    for index, category in enumerate(available):
-        group, _, title = category.partition(CATEGORY_SEPARATOR)
-        if not title:
-            group, title = GROUP_OTHER, category
-        if group not in items:
-            order.append(group)
-            items[group] = []
-        items[group].append(TopicItem(index=index, title=title, category=category))
-    return [TopicGroup(name=name, items=tuple(items[name])) for name in order]
 
 
 @dataclass(frozen=True, slots=True)

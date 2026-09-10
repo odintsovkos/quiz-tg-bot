@@ -15,9 +15,10 @@ from app.bot.handlers.quiz import (
 from app.bot.keyboards.common import main_menu
 from app.bot.keyboards.quiz import TOPICS_PAGE_SIZE, topic_chapters, topic_groups
 from app.models import LimitMode, Question
+from app.services.content.categories import group_topics
 from app.services.quiz.limits import KIND_QUIZ, KIND_RANDOM, LimitService
 from app.services.quiz.session import QuizSessionService
-from app.services.quiz.topics import TopicPreferenceService, group_topics
+from app.services.quiz.topics import TopicPreferenceService
 from app.services.settings import SettingsService
 from app.services.stats.scoring import RecordedAnswer
 from app.services.users import UserService

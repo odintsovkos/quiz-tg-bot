@@ -14,12 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.bot import replies, texts, texts_admin
 from app.bot.callbacks import AdminCallback, AdminChatCallback, AdminLimitCallback
 from app.bot.handlers.admin_questions import (
-    EmptyCategorySelection,
-    reset_chat_categories,
-    select_all_chat_categories,
-    show_chat_categories,
+    handle_chat_category_action,
     show_questions,
-    toggle_chat_category,
 )
 from app.bot.handlers.admin_users import show_admins
 from app.bot.keyboards import admin as keyboards
@@ -220,9 +216,10 @@ async def handle_chat_action(
         await query.answer()
         return
 
-    if action == "set_categories":
-        await show_chat_categories(query, session, user, chat)
-        await query.answer()
+    if action == "set_categories" or action.startswith("cat"):
+        # Экран категорий двухуровневый и со своими правилами — весь его
+        # разбор живёт рядом с ним, а не ветками этого маршрутизатора.
+        await handle_chat_category_action(query, callback_data, session, user, chat)
         return
 
     if action == "topic_clear":
@@ -235,37 +232,6 @@ async def handle_chat_action(
         await _show_chat(query, session, user, chat)
         await query.answer(texts_admin.CHAT_TOPIC_CLEARED)
         return
-
-    if action == "cat_noop":  # счётчик страниц — подпись, а не кнопка
-        await query.answer()
-        return
-
-    if action == "cat_page":
-        await show_chat_categories(query, session, user, chat, callback_data.page)
-        await query.answer()
-        return
-
-    if action == "cat_all":
-        await select_all_chat_categories(session, chat)
-        await show_chat_categories(query, session, user, chat, callback_data.page)
-        await query.answer(texts_admin.CHAT_CATEGORIES_ALL_SELECTED)
-        return
-
-    if action == "cat_reset":
-        await reset_chat_categories(session, chat)
-        await show_chat_categories(query, session, user, chat, callback_data.page)
-        await query.answer(texts_admin.CHAT_CATEGORIES_RESET)
-        return
-
-    if action.startswith("cat"):
-        try:
-            await toggle_chat_category(session, chat, int(action.removeprefix("cat")))
-        except (EmptyCategorySelection, ValueError):
-            await query.answer(texts_admin.SCHEDULE_EMPTY_CATEGORIES, show_alert=True)
-            return
-        # Переключение категории не уводит со страницы.
-        await show_chat_categories(query, session, user, chat, callback_data.page)
-        await query.answer(texts_admin.SCHEDULE_CATEGORIES_SAVED)
 
 
 async def _show_schedule(

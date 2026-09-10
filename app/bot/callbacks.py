@@ -82,13 +82,17 @@ class AdminCallback(CallbackData, prefix="adm"):
 class AdminChatCallback(CallbackData, prefix="admc"):
     """Действие над конкретным чатом из кабинета.
 
-    `page` возвращает к той же странице списка категорий: категорий под сотню,
-    одним списком их разметка не влезает в предел Telegram.
+    `group`, `index` и `page` адресуют экран категорий чата — руководство,
+    категорию в общем списке и страницу глав: категорий под сотню, одним
+    списком их разметка не влезает в предел Telegram, поэтому выбор
+    двухуровневый и возвращаться нужно на тот же экран.
     """
 
     action: str
     chat_id: int
     page: int = 0
+    group: int = -1
+    index: int = -1
 
 
 class AdminQuestionCallback(CallbackData, prefix="admq"):
