@@ -21,6 +21,7 @@ from aiogram.types import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.bot.texts import difficulty_line, poll_question
 from app.bot.throttling import send_with_retry
 from app.core.logging import get_logger
 from app.core.time import utc_now
@@ -29,6 +30,7 @@ from app.repositories.chats import ChatRepository
 from app.repositories.questions import QuestionRepository
 from app.services.quiz.options import shuffled_order
 from app.services.quiz.selector import QuestionSelector
+from app.services.stats.reading import StatsService
 from app.services.stats.scoring import RecordedAnswer, ScoringService
 
 logger = get_logger(__name__)
@@ -206,12 +208,23 @@ class GroupQuizService:
         ]
         correct_option_id = order.index(question.correct_index)
 
+        # Тема идёт первой строкой самого опроса: рядом с ним в группе места
+        # под контекст нет, а без темы вопрос из одной главы прочитывается
+        # как вопрос из другой. Под темой — сложность, и здесь она называется
+        # словами целиком: пояснить цветной кружок в чате негде.
+        difficulty = await StatsService(self._session).question_difficulty(
+            question.id, question.difficulty
+        )
+        poll_text = poll_question(
+            question.category, question.text, difficulty_line(difficulty) or ""
+        )
+
         def send(thread_id: int | None) -> Awaitable[Message]:
             return send_with_retry(
                 lambda: bot.send_poll(
                     chat_id=chat.id,
                     message_thread_id=thread_id,
-                    question=question.text,
+                    question=poll_text,
                     options=options,
                     type="quiz",
                     correct_option_id=correct_option_id,

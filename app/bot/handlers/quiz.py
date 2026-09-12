@@ -208,6 +208,7 @@ async def _send_current_question(
     # Порядок показа считается один раз: список в тексте и ряд кнопок под ним
     # собираются из него же, поэтому буквы не могут разойтись с вариантами.
     order = labelled_order(len(question.options), (quiz.id, item.position))
+    marker, context = await question_context(session, question)
     await _feed(
         target,
         session,
@@ -218,8 +219,30 @@ async def _send_current_question(
             quiz.total_questions,
             question.text,
             texts.option_block(order, [option.text for option in question.options]),
+            context,
+            marker,
         ),
         keyboards.session_question(order, quiz.id, item.position),
+    )
+
+
+async def question_context(
+    session: AsyncSession, question: Question
+) -> tuple[str, str]:
+    """Шапка вопроса — одна на экран сессии и на случайный вопрос.
+
+    Возвращает маркер сложности для строки заголовка и блок из темы
+    и раздела под ней.
+
+    Статистика читается в сессии обработчика: вторая сессия внутри
+    обработчика упёрлась бы в блокировку SQLite.
+    """
+    difficulty = await StatsService(session).question_difficulty(
+        question.id, question.difficulty
+    )
+    return (
+        texts.difficulty_marker(difficulty),
+        texts.question_context(question.category, question.reference),
     )
 
 
@@ -288,13 +311,14 @@ async def handle_session_answer(
 
 
 def feedback_text(recorded: RecordedAnswer, question: Question) -> str:
-    """Верность, верный вариант при ошибке, пояснение и ссылка."""
+    """Верность, верный вариант при ошибке и пояснение.
+
+    Раздела документации здесь нет: он показан в шапке вопроса до ответа.
+    """
     correct = None
     if not recorded.is_correct:
         correct = question.options[question.correct_index].text
-    return texts.answer_feedback(
-        correct, question.explanation or "", question.reference or ""
-    )
+    return texts.answer_feedback(correct, question.explanation or "")
 
 
 async def render_session_result(
@@ -408,11 +432,14 @@ async def send_random(target: Sender, session: AsyncSession, user: User) -> None
         return
 
     order = labelled_order(len(outcome.question.options), (outcome.issue.id,))
+    marker, context = await question_context(session, outcome.question)
     text = texts.random_question_screen(
         outcome.question.text,
         texts.option_block(
             order, [option.text for option in outcome.question.options]
         ),
+        context,
+        marker,
     )
     if outcome.topics_fell_back:
         # Отдельным сообщением предупреждение завело бы вторую ленту:

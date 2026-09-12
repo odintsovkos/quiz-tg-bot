@@ -26,7 +26,7 @@ from app.bot.handlers.quiz import (
     handle_session_answer,
     send_random,
 )
-from app.models import Question, SessionStatus
+from app.models import Difficulty, Question, SessionStatus
 from app.repositories.sessions import SessionRepository
 from app.services.quiz.review import ReviewService
 from app.services.quiz.session import QuizSessionService
@@ -406,3 +406,72 @@ async def test_the_review_of_a_played_session_shows_the_wrong_choice(session):
 
     assert items[0].chosen != items[0].correct
     assert "Вы ответили" in text
+
+
+# --- шапка вопроса одна на оба личных экрана ------------------------------
+
+
+def context_lines(rendered: str) -> list[str]:
+    """Строки шапки: всё между заголовком экрана и цитатой с вопросом."""
+    head, _, _ = rendered.partition("\n\n<blockquote>")
+    return head.splitlines()[1:]
+
+
+def title_line(rendered: str) -> str:
+    """Строка заголовка — в ней же маркер сложности."""
+    return rendered.splitlines()[0]
+
+
+def options_block(rendered: str) -> list[str]:
+    """Напечатанные варианты ответа: всё после цитаты с вопросом."""
+    _, _, tail = rendered.partition("</blockquote>\n\n")
+    return tail.splitlines()
+
+
+async def test_both_private_screens_show_the_same_question_context(session):
+    session.add(
+        make_question(
+            "q.one",
+            "Разработчик · Глава 6. Командный интерфейс",
+            difficulty=Difficulty.MEDIUM,
+            reference="6.1.2.1.1. Формирование и размещение стандартных команд",
+        )
+    )
+    user = await UserService(session).register(7, "Иван", now=MOMENT)
+    await SettingsService(session).set_session_size(1)
+    await session.flush()
+
+    from_session = ScreenBot()
+    await handle_quiz_command(command(from_session), session, user)
+
+    from_random = ScreenBot()
+    await send_random(command(from_random), session, user)
+
+    session_screen = from_session.sent[-1][1]
+    random_screen = from_random.sent[-1][1]
+
+    shown = context_lines(session_screen)
+    assert shown == context_lines(random_screen)
+    assert shown == [
+        "📘 Разработчик · Глава 6. Командный интерфейс",
+        "<i>6.1.2.1.1. Формирование и размещение стандартных команд</i>",
+    ]
+
+    # Маркер сложности — в строке заголовка, у обоих экранов.
+    assert title_line(session_screen) == "<b>Вопрос 1 из 1</b>  🟡 Сложность: средняя"
+    assert title_line(random_screen) == "<b>Случайный вопрос</b>  🟡 Сложность: средняя"
+
+    # Варианты по-прежнему напечатаны в теле сообщения, под вопросом.
+    assert len(options_block(session_screen)) == 4
+    assert options_block(session_screen)[0].startswith("<b>А.</b> ")
+
+
+async def test_question_without_section_and_difficulty_shows_only_the_category(session):
+    session.add(make_question("q.bare", "Тема из имени файла", reference=None))
+    user = await UserService(session).register(8, "Пётр", now=MOMENT)
+    await session.flush()
+
+    bot = ScreenBot()
+    await send_random(command(bot), session, user)
+
+    assert context_lines(bot.sent[-1][1]) == ["📘 Тема из имени файла"]
