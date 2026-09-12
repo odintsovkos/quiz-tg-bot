@@ -51,7 +51,11 @@ class Answer(Base):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
-    question_id: Mapped[str] = mapped_column(ForeignKey("questions.id", ondelete="CASCADE"))
+    # Индекс нужен агрегату «ответов на вопрос и верных среди них»: внешний
+    # ключ в SQLite индекса не создаёт.
+    question_id: Mapped[str] = mapped_column(
+        ForeignKey("questions.id", ondelete="CASCADE"), index=True
+    )
     source: Mapped[AnswerSource] = mapped_column(EnumText(AnswerSource, 16))
     chat_id: Mapped[int | None] = mapped_column(BigInteger, default=None)
     poll_id: Mapped[str | None] = mapped_column(String(64), default=None)

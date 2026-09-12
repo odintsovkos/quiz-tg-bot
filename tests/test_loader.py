@@ -140,3 +140,40 @@ def test_inactive_flag_is_read(tmp_path):
     result = load_file(path, root=tmp_path)
 
     assert result.drafts[0].is_active is False
+
+
+def test_difficulty_is_left_unset_when_the_file_has_none(tmp_path):
+    """Отсутствие сложности не подменяется «средней»: см. спеку quiz-content."""
+    content = VALID_YAML.replace("    difficulty: medium\n", "")
+    path = write(tmp_path, "dev/ch08.yaml", content)
+
+    result = load_file(path, root=tmp_path)
+
+    assert result.ok
+    assert result.drafts[0].difficulty is None
+
+
+def test_file_with_only_questions_and_options_is_read(tmp_path):
+    """Минимальный файл: категория выводится из имени, остальное не задано."""
+    write(
+        tmp_path,
+        "ch06-komandnyy-interfeys.yaml",
+        """
+questions:
+  - id: q1
+    text: При каком условии у отчёта формируется стандартная команда?
+    options:
+      - text: Задана основная схема компоновки данных
+        correct: true
+      - text: Отчёт включён хотя бы в одну подсистему
+""",
+    )
+
+    result = load_directory(tmp_path)
+
+    assert result.ok, [str(issue) for issue in result.issues]
+    draft = result.drafts[0]
+    assert draft.category == "ch06-komandnyy-interfeys"
+    assert draft.difficulty is None
+    assert draft.explanation is None
+    assert draft.reference is None

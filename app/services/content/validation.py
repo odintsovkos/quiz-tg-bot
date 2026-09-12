@@ -36,7 +36,8 @@ class QuestionDraft:
     id: str
     text: str
     category: str
-    difficulty: str
+    #: Авторская оценка сложности; `None` — не задана, и это не нарушение.
+    difficulty: str | None
     options: tuple[OptionDraft, ...]
     explanation: str | None = None
     reference: str | None = None
@@ -98,7 +99,10 @@ def validate_question(draft: QuestionDraft, source: str | None = None) -> Valida
     if not draft.category.strip():
         fail("не заполнено обязательное поле «category»")
 
-    if draft.difficulty not in {item.value for item in Difficulty}:
+    # Сложность необязательна: проверяется только заданное значение.
+    if draft.difficulty is not None and draft.difficulty not in {
+        item.value for item in Difficulty
+    }:
         allowed = ", ".join(item.value for item in Difficulty)
         fail(f"недопустимая сложность «{draft.difficulty}», допустимо: {allowed}")
 

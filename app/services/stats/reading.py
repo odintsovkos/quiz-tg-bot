@@ -5,14 +5,22 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import User, UserDailyStats, UserTotalStats
+from app.models import Answer, Difficulty, User, UserDailyStats, UserTotalStats
 from app.services.settings import SettingsService
 
 PERIOD_TODAY = "today"
 PERIOD_TOTAL = "total"
+
+#: Сколько учтённых ответов нужно, чтобы доля верных что-то говорила о вопросе.
+#: По трём-четырём ответам доля — шум, и выдавать её за сложность нельзя.
+DIFFICULTY_SAMPLE_THRESHOLD = 20
+
+#: Границы уровней по доле верных ответов.
+EASY_SHARE_FROM = 0.7
+MEDIUM_SHARE_FROM = 0.4
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,6 +40,91 @@ class StatsLine:
 
 
 EMPTY = StatsLine(0, 0, 0)
+
+
+@dataclass(frozen=True, slots=True)
+class QuestionStats:
+    """Ответы на один вопрос банка: сколько учтено и сколько из них верных."""
+
+    answers: int
+    correct: int
+
+    @property
+    def share(self) -> float | None:
+        """Доля верных; при нуле ответов — отсутствует, а не ноль."""
+        if self.answers <= 0:
+            return None
+        return self.correct / self.answers
+
+    @property
+    def is_reliable(self) -> bool:
+        """Набралось ли ответов, чтобы доля что-то значила."""
+        return self.answers >= DIFFICULTY_SAMPLE_THRESHOLD
+
+
+EMPTY_QUESTION_STATS = QuestionStats(0, 0)
+
+
+@dataclass(frozen=True, slots=True)
+class QuestionDifficulty:
+    """Сложность вопроса в одном из трёх состояний.
+
+    Состояния различимы снаружи: измеренная (`measured` и `share` заданы),
+    только авторская (`authored` задан, `share` — нет) и неизвестная (ничего).
+    Подставлять уровень по умолчанию нельзя: участник не отличил бы его
+    от настоящего.
+    """
+
+    authored: Difficulty | None
+    measured: Difficulty | None
+    share: float | None
+    answers: int
+
+    @property
+    def shown(self) -> Difficulty | None:
+        """Уровень, который идёт на экран: измеренный, иначе авторский."""
+        return self.measured or self.authored
+
+    @property
+    def is_measured(self) -> bool:
+        return self.measured is not None
+
+    @property
+    def percent(self) -> int | None:
+        """Доля верных в процентах — одна на все экраны, чтобы не разошлись.
+
+        Округление арифметическое: встроенный `round` банковский и превратил
+        бы 22,5% в 22, а участник ждёт 23.
+        """
+        if self.share is None:
+            return None
+        return int(self.share * 100 + 0.5)
+
+
+def level_of_share(share: float) -> Difficulty:
+    """Уровень по доле верных ответов."""
+    if share >= EASY_SHARE_FROM:
+        return Difficulty.EASY
+    if share >= MEDIUM_SHARE_FROM:
+        return Difficulty.MEDIUM
+    return Difficulty.HARD
+
+
+def difficulty_of(
+    stats: QuestionStats, authored: Difficulty | None
+) -> QuestionDifficulty:
+    """Свести статистику вопроса и авторскую оценку в одно из трёх состояний."""
+    share = stats.share
+    if stats.is_reliable and share is not None:
+        return QuestionDifficulty(
+            authored=authored,
+            measured=level_of_share(share),
+            share=share,
+            answers=stats.answers,
+        )
+    return QuestionDifficulty(
+        authored=authored, measured=None, share=None, answers=stats.answers
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,6 +158,36 @@ class StatsService:
 
     async def total(self, user_id: int) -> StatsLine:
         return _line(await self._session.get(UserTotalStats, user_id))
+
+    async def question(self, question_id: str) -> QuestionStats:
+        """Учтённые ответы на вопрос и верные среди них — одним агрегатом.
+
+        Считается по `answers`, а не по отдельной таблице-счётчику: экран
+        показывает один вопрос, поэтому это один запрос по индексу
+        `ix_answers_question_id`. Неучтённые ответы (режим без лимитов для
+        администраторов) в счёт не идут — иначе прогоны администратора по
+        своему же банку искажали бы картину.
+        """
+        row = (
+            await self._session.execute(
+                select(
+                    func.count(Answer.id),
+                    func.coalesce(
+                        func.sum(case((Answer.is_correct, 1), else_=0)), 0
+                    ),
+                ).where(
+                    Answer.question_id == question_id,
+                    Answer.counted.is_(True),
+                )
+            )
+        ).one()
+        return QuestionStats(answers=int(row[0]), correct=int(row[1]))
+
+    async def question_difficulty(
+        self, question_id: str, authored: Difficulty | None
+    ) -> QuestionDifficulty:
+        """Сложность вопроса для показа: измеренная, авторская или никакая."""
+        return difficulty_of(await self.question(question_id), authored)
 
     async def rank(self, user_id: int, period: str, day: date | None = None) -> int | None:
         """Место участника; `None`, если попыток в периоде не было."""

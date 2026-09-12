@@ -115,7 +115,7 @@ def test_question_screens_escape_the_question_text():
 
 
 def test_feedback_separates_the_verdict_from_the_correct_option():
-    text = texts.answer_feedback("Регистр накопления", "", "")
+    text = texts.answer_feedback("Регистр накопления", "")
 
     verdict, _, correct = text.partition("\n\n")
     assert "Неверно" in verdict
@@ -123,23 +123,28 @@ def test_feedback_separates_the_verdict_from_the_correct_option():
 
 
 def test_feedback_quotes_the_explanation_after_the_verdict():
-    text = texts.answer_feedback(None, "Потому что так", "8.1. Раздел")
+    text = texts.answer_feedback(None, "Потому что так")
 
     assert text.startswith("✅ <b>Верно!</b>")
-    assert "<blockquote>Потому что так</blockquote>" in text
-    assert text.endswith("<i>Источник: 8.1. Раздел</i>")
+    assert text.endswith("<blockquote>Потому что так</blockquote>")
+
+
+def test_feedback_does_not_repeat_the_section():
+    """Раздел показан в шапке вопроса до ответа, в разборе его нет."""
+    text = texts.answer_feedback(None, "Потому что так")
+
+    assert "Источник" not in text
 
 
 def test_feedback_without_explanation_is_just_the_verdict():
-    assert texts.answer_feedback(None, "", "") == texts.ANSWER_CORRECT
+    assert texts.answer_feedback(None, "") == texts.ANSWER_CORRECT
 
 
 def test_feedback_escapes_everything_that_comes_from_the_bank():
-    text = texts.answer_feedback("1 < 2", "A & B", "<i>раздел</i>")
+    text = texts.answer_feedback("1 < 2", "A & B")
 
     assert "1 &lt; 2" in text
     assert "A &amp; B" in text
-    assert "&lt;i&gt;раздел&lt;/i&gt;" in text
 
 
 # --- клавиатуры ----------------------------------------------------------
@@ -235,9 +240,10 @@ async def test_answer_by_shown_button_is_scored_and_reviewed(session):
 def test_admin_card_keeps_the_storage_order():
     """В кабинете список вариантов — редактируемый источник, его не мешаем."""
     from app.bot.handlers.admin_questions import render_question
+    from app.services.stats.reading import QuestionStats, difficulty_of
 
     question = make_question()
-    card = render_question(question)
+    card = render_question(question, difficulty_of(QuestionStats(0, 0), None))
     shown = [line for line in card.splitlines() if line.startswith(("✅", "▫️"))]
 
     assert [line.split()[-1] for line in shown] == ["0", "1", "2", "3"]

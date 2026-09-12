@@ -25,7 +25,7 @@ from app.bot.handlers.admin_questions import (
     chat_categories,
     draft_from_form,
     parse_options,
-    render_question,
+    question_card,
     toggle_chat_category,
 )
 from app.bot.handlers.admin_users import render_admins
@@ -226,7 +226,7 @@ async def test_question_card_shows_options_and_edit_trace(session):
         editor_id=admin.id,
         now=MOMENT,
     )
-    text = render_question(await service.get("dev.001"))
+    text = await question_card(session, await service.get("dev.001"))
 
     assert "Новая формулировка?" in text
     assert "✅" in text
@@ -529,3 +529,99 @@ def test_the_rejection_names_the_configured_bounds():
     text = texts_admin.SCHEDULE_BAD_INTERVAL.format(minimum=5, maximum=24 * 60)
 
     assert "5" in text and "1440" in text
+
+
+# --- сложность на карточке вопроса ---------------------------------------
+
+
+async def record_answers(session, question_id: str, *, answers: int, correct: int):
+    """Ответы разных участников на один вопрос — для статистики вопроса."""
+    from app.models import Answer
+
+    for index in range(answers):
+        session.add(
+            Answer(
+                user_id=(await UserService(session).register(
+                    100 + index, f"Участник {index}", now=MOMENT
+                )).id,
+                question_id=question_id,
+                source=AnswerSource.PRIVATE,
+                is_correct=index < correct,
+                counted=True,
+                answered_at=MOMENT,
+                quiz_date=MOMENT.date(),
+            )
+        )
+    await session.flush()
+
+
+async def test_card_shows_the_authored_and_the_measured_difficulty(session):
+    from app.models import Difficulty
+
+    session.add(make_question("dev.001", DEV, difficulty=Difficulty.MEDIUM))
+    await session.flush()
+    await record_answers(session, "dev.001", answers=40, correct=9)
+
+    card = await question_card(session, await session.get(Question, "dev.001"))
+
+    assert "medium по оценке автора" in card
+    assert "фактически 23% верных из 40 ответов" in card
+
+
+async def test_card_below_the_threshold_names_the_number_of_answers(session):
+    from app.models import Difficulty
+    from app.services.stats.reading import DIFFICULTY_SAMPLE_THRESHOLD
+
+    session.add(make_question("dev.002", DEV, difficulty=Difficulty.HARD))
+    await session.flush()
+    await record_answers(session, "dev.002", answers=7, correct=2)
+
+    card = await question_card(session, await session.get(Question, "dev.002"))
+
+    assert "hard по оценке автора" in card
+    assert f"ответов 7, для оценки по факту нужно {DIFFICULTY_SAMPLE_THRESHOLD}" in card
+    assert "%" not in card
+
+
+async def test_card_of_a_question_without_authored_difficulty(session):
+    session.add(make_question("dev.003", DEV))
+    await session.flush()
+
+    card = await question_card(session, await session.get(Question, "dev.003"))
+
+    assert "автором не задана" in card
+    assert "medium" not in card
+
+
+async def test_step_by_step_form_can_skip_the_difficulty(session):
+    await UserService(session).register(7, "Иван", now=MOMENT)
+    form = {
+        "identifier": "dev.ch08.501",
+        "text": "Что делает слово РАЗЛИЧНЫЕ?",
+        "options": "*Убирает дубли\nСортирует\nГруппирует\nОграничивает",
+        "category": DEV,
+        "difficulty": "-",
+        "explanation": "-",
+    }
+
+    question = await AdminQuestionService(session).save(
+        draft_from_form(form), editor_id=7, now=MOMENT
+    )
+
+    assert question.difficulty is None
+    assert "автором не задана" in await question_card(session, question)
+
+
+async def test_editing_can_clear_the_difficulty(session):
+    from app.models import Difficulty
+
+    session.add(make_question("dev.004", DEV, difficulty=Difficulty.HARD))
+    await session.flush()
+    service = AdminQuestionService(session)
+    question = await service.get("dev.004")
+
+    await service.save(
+        apply_field(draft_from(question), "difficulty", "-"), editor_id=7, now=MOMENT
+    )
+
+    assert (await service.get("dev.004")).difficulty is None

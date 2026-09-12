@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.core.db import SessionFactory, create_engine, create_session_factory
-from app.models import Base, Question, QuestionOption, User, UserRole
+from app.models import Base, Difficulty, Question, QuestionOption, User, UserRole
 from app.services.settings import SettingsService
 
 
@@ -62,14 +62,17 @@ def make_question(
     is_active: bool = True,
     correct_index: int = 0,
     option_count: int = 4,
+    difficulty: Difficulty | None = None,
+    reference: str | None = "8.1. Раздел",
 ) -> Question:
     return Question(
         id=question_id,
         text=f"Вопрос {question_id}?",
         category=category,
+        difficulty=difficulty,
         is_active=is_active,
         explanation="Пояснение",
-        reference="8.1. Раздел",
+        reference=reference,
         options=[
             QuestionOption(
                 position=index,

@@ -52,7 +52,8 @@ async def test_wrong_answer_shows_the_correct_option_and_explanation(session):
     assert "Неверно" in text
     assert question.options[question.correct_index].text in text
     assert "Пояснение" in text
-    assert "8.1. Раздел" in text
+    # Раздел был в шапке вопроса до ответа, в разборе его нет.
+    assert "8.1. Раздел" not in text
 
 
 async def test_correct_answer_confirms_and_shows_the_explanation(session):

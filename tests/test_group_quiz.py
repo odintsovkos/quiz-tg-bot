@@ -92,6 +92,28 @@ async def add_questions(session, count: int, category: str = DEV, prefix: str = 
     await session.flush()
 
 
+async def record_group_answers(session, question_id: str, *, answers: int, correct: int):
+    """Учтённые ответы разных участников — чтобы сложность стала измеренной."""
+    from app.models import Answer, AnswerSource
+
+    for index in range(answers):
+        user = await UserService(session).register(
+            100 + index, f"Участник {index}", now=MOMENT
+        )
+        session.add(
+            Answer(
+                user_id=user.id,
+                question_id=question_id,
+                source=AnswerSource.GROUP,
+                is_correct=index < correct,
+                counted=True,
+                answered_at=MOMENT,
+                quiz_date=MOMENT.date(),
+            )
+        )
+    await session.flush()
+
+
 # --- подключение и отключение --------------------------------------------
 
 
@@ -196,6 +218,85 @@ async def test_publish_sends_a_quiz_poll_with_explanation(session):
     assert sent["explanation"] == "Пояснение"
     assert sent["options"][sent["correct_option_id"]] == "Вариант 0"
     assert outcome.poll is not None
+
+
+async def test_publish_puts_the_category_first_in_the_poll(session):
+    """Спека group-quiz: «Категория видна в опросе»."""
+    await add_questions(session, 1)
+    chat = await add_chat(session)
+    bot = FakeBot()
+
+    await GroupQuizService(session).publish(bot, chat, now=MOMENT)
+
+    category, blank, question = bot.polls[0]["question"].split("\n")
+    assert category == DEV
+    assert blank == ""
+    assert question == "Вопрос q.000?"
+
+
+async def test_publish_keeps_the_question_whole_when_the_category_does_not_fit(
+    session,
+):
+    """Спека group-quiz: «Категория не влезает в ограничение формата»."""
+    long_category = "Руководство " + "очень длинной главы " * 9
+    text = "Вопрос, которому не хватает места на тему? " * 4
+    question = make_question("q.long", long_category.strip())
+    question.text = text.strip()
+    session.add(question)
+    await session.flush()
+    chat = await add_chat(session, categories=[long_category.strip()])
+    bot = FakeBot()
+
+    await GroupQuizService(session).publish(bot, chat, now=MOMENT)
+
+    assert bot.polls[0]["question"] == text.strip()
+
+
+async def test_poll_shows_the_difficulty_under_the_category(session):
+    """Сложность в группе называется словами: цветной кружок пояснить негде."""
+    from app.models import Difficulty
+
+    question = make_question(
+        "q.marked", DEV, difficulty=Difficulty.HARD, reference="8.1. Раздел"
+    )
+    session.add(question)
+    await session.flush()
+    chat = await add_chat(session)
+    bot = FakeBot()
+
+    await GroupQuizService(session).publish(bot, chat, now=MOMENT)
+
+    category, difficulty, blank, text = bot.polls[0]["question"].split("\n")
+    assert category == DEV
+    assert difficulty == "🔴 Сложность: высокая"
+    assert (blank, text) == ("", "Вопрос q.marked?")
+
+
+async def test_poll_shows_the_measured_share_once_it_is_known(session):
+    """После порога в группу идёт та же доля верных, что и в личке."""
+    question = make_question("q.known", DEV)
+    session.add(question)
+    await session.flush()
+    await record_group_answers(session, "q.known", answers=40, correct=9)
+    chat = await add_chat(session)
+    bot = FakeBot()
+
+    await GroupQuizService(session).publish(bot, chat, now=MOMENT)
+
+    assert bot.polls[0]["question"].splitlines()[1] == "🔴 верно отвечают 23%"
+
+
+async def test_poll_never_carries_the_section(session):
+    """Раздел в группу не идёт: три строки над вопросом там уже много."""
+    question = make_question("q.ref", DEV, reference="8.1. Раздел")
+    session.add(question)
+    await session.flush()
+    chat = await add_chat(session)
+    bot = FakeBot()
+
+    await GroupQuizService(session).publish(bot, chat, now=MOMENT)
+
+    assert "8.1. Раздел" not in bot.polls[0]["question"]
 
 
 async def test_publish_links_the_poll_with_the_question_and_chat(session):

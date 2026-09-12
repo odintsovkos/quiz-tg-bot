@@ -24,8 +24,11 @@ class Question(Base):
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     text: Mapped[str] = mapped_column(Text())
     category: Mapped[str] = mapped_column(String(256), index=True)
-    difficulty: Mapped[Difficulty] = mapped_column(
-        EnumText(Difficulty, 16), default=Difficulty.MEDIUM
+    #: Авторская оценка сложности. Может быть не задана: подставлять вместо
+    #: неё «среднюю» нельзя — участник не отличил бы её от проставленной
+    #: автором, а показываемая сложность считается по статистике ответов.
+    difficulty: Mapped[Difficulty | None] = mapped_column(
+        EnumText(Difficulty, 16), default=None
     )
     is_active: Mapped[bool] = mapped_column(
         Boolean(), default=True, server_default="1", index=True

@@ -200,3 +200,53 @@ async def test_export_import_round_trip(session_factory, tmp_path, engine):
         await clean_engine.dispose()
 
     assert restored == original
+
+
+async def test_export_import_round_trip_keeps_question_without_difficulty(
+    session_factory, tmp_path
+):
+    """Выгрузка не дописывает оценку, которой автор не давал."""
+    from app.core.db import create_engine, create_session_factory
+    from app.models import Base
+
+    root = tmp_path / "bank"
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "ch06.yaml").write_text(
+        """
+manual: {id: dev, short: Разработчик}
+chapter: {id: ch06, title: Глава 6. Командный интерфейс}
+questions:
+  - id: dev.ch06.001
+    text: Какое свойство отключает формирование стандартных команд?
+    options:
+      - {text: Использовать стандартные команды, correct: true}
+      - {text: Командный интерфейс}
+""",
+        encoding="utf-8",
+    )
+
+    async with session_scope(session_factory) as session:
+        await import_directory(session, root)
+
+    export_dir = tmp_path / "export"
+    async with session_scope(session_factory) as session:
+        assert await export_questions(session, export_dir) == 1
+
+    exported = next(export_dir.iterdir()).read_text(encoding="utf-8")
+    assert "difficulty" not in exported
+
+    clean_engine = create_engine(f"sqlite+aiosqlite:///{tmp_path / 'clean.sqlite3'}")
+    async with clean_engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
+    clean_factory = create_session_factory(clean_engine)
+    try:
+        async with session_scope(clean_factory) as session:
+            report = await import_directory(session, export_dir)
+            assert report.added == 1
+
+        async with session_scope(clean_factory) as session:
+            restored = (await session.scalars(select(Question))).one()
+            assert restored.difficulty is None
+            assert restored.text.startswith("Какое свойство")
+    finally:
+        await clean_engine.dispose()

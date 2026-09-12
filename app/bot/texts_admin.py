@@ -111,6 +111,16 @@ QUESTION_CARD = (
     "Источник: {reference}\n"
     "{edited}"
 )
+#: Сложность на карточке: авторская оценка и фактическая — рядом. По ним
+#: автор находит вопросы, которые понимают неверно почти все.
+QUESTION_DIFFICULTY = "{authored} · {measured}"
+QUESTION_DIFFICULTY_AUTHORED = "{level} по оценке автора"
+QUESTION_DIFFICULTY_AUTHORED_NONE = "автором не задана"
+QUESTION_DIFFICULTY_MEASURED = "фактически {percent}% верных из {answers} ответов"
+QUESTION_DIFFICULTY_NOT_ENOUGH = (
+    "ответов {answers}, для оценки по факту нужно {threshold}"
+)
+
 QUESTION_STATE_ACTIVE = "активен"
 QUESTION_STATE_INACTIVE = "деактивирован"
 QUESTION_EDITED_BY = "Правил: {user} в {moment}"
@@ -127,7 +137,10 @@ QUESTION_ASK_OPTIONS = (
     "звёздочкой в начале строки:\n<code>*Верный вариант\nНеверный вариант</code>"
 )
 QUESTION_ASK_CATEGORY = "Введите категорию (тему) вопроса."
-QUESTION_ASK_DIFFICULTY = "Введите сложность: easy, medium или hard."
+QUESTION_ASK_DIFFICULTY = (
+    "Введите сложность: easy, medium или hard — или отправьте <code>-</code>, "
+    "чтобы оставить её незаданной."
+)
 QUESTION_ASK_EXPLANATION = (
     "Введите пояснение (до 200 символов) или отправьте <code>-</code>, чтобы пропустить."
 )

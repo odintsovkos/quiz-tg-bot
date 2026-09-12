@@ -23,12 +23,49 @@ from app.services.admin import (
 )
 from app.services.content.categories import group_topics
 from app.services.content.validation import OptionDraft, QuestionDraft
+from app.services.stats.reading import (
+    DIFFICULTY_SAMPLE_THRESHOLD,
+    QuestionDifficulty,
+    StatsService,
+)
 
 CORRECT_MARK = "*"
 SKIP = "-"
 
 
-def render_question(question: Question) -> str:
+def difficulty_field(difficulty: QuestionDifficulty) -> str:
+    """Сложность для карточки: авторская оценка и фактическая доля рядом.
+
+    Ниже порога достоверности доля не называется вовсе — только число
+    ответов: выдавать 2 из 3 за фактическую сложность нельзя.
+    """
+    authored = (
+        texts_admin.QUESTION_DIFFICULTY_AUTHORED.format(
+            level=difficulty.authored.value
+        )
+        if difficulty.authored is not None
+        else texts_admin.QUESTION_DIFFICULTY_AUTHORED_NONE
+    )
+    if difficulty.is_measured:
+        measured = texts_admin.QUESTION_DIFFICULTY_MEASURED.format(
+            percent=difficulty.percent, answers=difficulty.answers
+        )
+    else:
+        measured = texts_admin.QUESTION_DIFFICULTY_NOT_ENOUGH.format(
+            answers=difficulty.answers, threshold=DIFFICULTY_SAMPLE_THRESHOLD
+        )
+    return texts_admin.QUESTION_DIFFICULTY.format(authored=authored, measured=measured)
+
+
+async def question_card(session: AsyncSession, question: Question) -> str:
+    """Карточка вопроса вместе со статистикой ответов по нему."""
+    difficulty = await StatsService(session).question_difficulty(
+        question.id, question.difficulty
+    )
+    return render_question(question, difficulty)
+
+
+def render_question(question: Question, difficulty: QuestionDifficulty) -> str:
     """Карточка вопроса."""
     options = "\n".join(
         f"{'✅' if option.is_correct else '▫️'} {option.text}"
@@ -45,7 +82,7 @@ def render_question(question: Question) -> str:
         id=question.id,
         text=question.text,
         category=question.category,
-        difficulty=str(question.difficulty),
+        difficulty=difficulty_field(difficulty),
         state=(
             texts_admin.QUESTION_STATE_ACTIVE
             if question.is_active
@@ -111,7 +148,7 @@ async def handle_question_action(
             query,
             session,
             user,
-            render_question(question),
+            await question_card(session, question),
             keyboards.question_card(question, callback_data.page),
         )
     elif action == "toggle":
@@ -120,7 +157,7 @@ async def handle_question_action(
             query,
             session,
             user,
-            render_question(question),
+            await question_card(session, question),
             keyboards.question_card(question, callback_data.page),
         )
         await query.answer(
@@ -178,7 +215,8 @@ def apply_field(draft: QuestionDraft, field: str, raw: str) -> QuestionDraft:
     if field == "category":
         return replace(draft, category=value)
     if field == "difficulty":
-        return replace(draft, difficulty=value)
+        # Пропуск оставляет сложность незаданной, а не подставляет «среднюю».
+        return replace(draft, difficulty=None if value == SKIP else value)
     raise ValueError(f"Поле {field} не редактируется из кабинета")
 
 
@@ -222,7 +260,7 @@ async def handle_question_edit(
         message,
         session,
         user,
-        texts_admin.QUESTION_SAVED + "\n\n" + render_question(saved),
+        texts_admin.QUESTION_SAVED + "\n\n" + await question_card(session, saved),
         keyboards.question_card(saved, page),
     )
 
@@ -274,11 +312,13 @@ async def add_difficulty(message: Message, state: FSMContext) -> None:
 def draft_from_form(data: dict[str, str]) -> QuestionDraft:
     """Собрать черновик из ответов пошагового диалога."""
     explanation = data.get("explanation", "").strip()
+    difficulty = data.get("difficulty", "").strip()
     return QuestionDraft(
         id=data["identifier"],
         text=data["text"],
         category=data["category"],
-        difficulty=data["difficulty"],
+        # Пропуск шага оставляет сложность незаданной.
+        difficulty=None if difficulty in ("", SKIP) else difficulty,
         options=parse_options(data["options"]),
         explanation=None if explanation in ("", SKIP) else explanation,
         is_active=True,
@@ -305,7 +345,7 @@ async def add_explanation(
 
     await state.clear()
     await message.answer(texts_admin.QUESTION_ADDED.format(id=question.id))
-    await message.answer(render_question(question))
+    await message.answer(await question_card(session, question))
 
 
 # --- категории чата ------------------------------------------------------
