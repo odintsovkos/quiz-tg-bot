@@ -152,17 +152,17 @@ async def export_questions(session: AsyncSession, target: Path) -> int:
 
 
 def _question_payload(question: Question) -> dict[str, Any]:
-    payload: dict[str, Any] = {
-        "id": question.id,
-        "text": question.text,
-        "difficulty": str(question.difficulty),
-        "options": [
-            {"text": option.text, "correct": True}
-            if option.is_correct
-            else {"text": option.text}
-            for option in question.options
-        ],
-    }
+    payload: dict[str, Any] = {"id": question.id, "text": question.text}
+    # Незаданная сложность не пишется: иначе выгрузка дописала бы вопросу
+    # оценку, которой автор не давал, и круговой цикл перестал бы совпадать.
+    if question.difficulty is not None:
+        payload["difficulty"] = question.difficulty.value
+    payload["options"] = [
+        {"text": option.text, "correct": True}
+        if option.is_correct
+        else {"text": option.text}
+        for option in question.options
+    ]
     if question.explanation:
         payload["explanation"] = question.explanation
     if question.reference:

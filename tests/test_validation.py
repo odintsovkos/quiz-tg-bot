@@ -84,7 +84,14 @@ def test_no_correct_option_is_rejected():
 
 
 def test_unknown_difficulty_is_rejected():
-    assert "сложность" in messages(validate_question(draft(difficulty="невозможный")))
+    rendered = messages(validate_question(draft(difficulty="невозможный")))
+    assert "сложность" in rendered
+    assert "easy" in rendered and "medium" in rendered and "hard" in rendered
+
+
+def test_missing_difficulty_is_allowed():
+    """Сложность необязательна: её отсутствие — не нарушение."""
+    assert validate_question(draft(difficulty=None)).ok
 
 
 def test_duplicate_options_are_rejected():

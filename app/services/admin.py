@@ -59,7 +59,7 @@ def draft_from(question: Question) -> QuestionDraft:
         id=question.id,
         text=question.text,
         category=question.category,
-        difficulty=str(question.difficulty),
+        difficulty=question.difficulty.value if question.difficulty else None,
         options=tuple(
             OptionDraft(text=option.text, is_correct=option.is_correct)
             for option in question.options
