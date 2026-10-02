@@ -243,7 +243,7 @@ class StatsService:
 
     def _period_query(
         self, period: str, day: date | None
-    ) -> Select[tuple[int, str, int, int, int]]:
+    ) -> Select[int, str, int, int, int]:
         if period == PERIOD_TODAY:
             if day is None:
                 raise ValueError("Для периода «сегодня» нужна дата викторины")

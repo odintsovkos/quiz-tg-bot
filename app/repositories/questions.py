@@ -37,7 +37,7 @@ class QuestionRepository:
             statement = statement.where(Question.is_active.is_(is_active))
         return int(await self._session.scalar(statement) or 0)
 
-    def _active_in_categories(self, categories: list[str] | None) -> Select[tuple[Question]]:
+    def _active_in_categories(self, categories: list[str] | None) -> Select[Question]:
         statement = select(Question).where(Question.is_active.is_(True))
         if categories:
             statement = statement.where(Question.category.in_(categories))

@@ -84,7 +84,7 @@ class AdminQuestionService:
 
     def _filtered(
         self, category: str | None, is_active: bool | None
-    ) -> Select[tuple[Question]]:
+    ) -> Select[Question]:
         statement = select(Question)
         if category:
             statement = statement.where(Question.category == category)
